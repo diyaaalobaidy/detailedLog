@@ -47,6 +47,20 @@ class DetailedLogPlugin extends GenericPlugin
     }
 
     /**
+     * @copydoc LazyLoadPlugin::getEnabled()
+     *
+     * Enabled by default across all journals unless explicitly disabled.
+     */
+    public function getEnabled($contextId = null)
+    {
+        $setting = parent::getEnabled($contextId);
+        if ($setting === false || $setting === '0' || $setting === 0) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * @copydoc Plugin::register()
      */
     public function register($category, $path, $mainContextId = null)
