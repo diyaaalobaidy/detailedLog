@@ -78,14 +78,6 @@ class DetailedLogHelper
             );
 
             error_log($message);
-
-            if (class_exists(\Illuminate\Support\Facades\Log::class)) {
-                try {
-                    \Illuminate\Support\Facades\Log::error($message, ['exception' => $e]);
-                } catch (\Throwable) {
-                    // Suppress Laravel logger issues
-                }
-            }
         } catch (\Throwable) {
             // Absolute silence: never allow logger failure to interrupt the request
         }

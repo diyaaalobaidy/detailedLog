@@ -385,7 +385,10 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
         // Must have editorial or manager role to export
         $userRoles = $this->getAuthorizedContextObject(Application::ASSOC_TYPE_USER_ROLES);
         if (!array_intersect([Role::ROLE_ID_MANAGER, Role::ROLE_ID_SITE_ADMIN, Role::ROLE_ID_SUB_EDITOR, Role::ROLE_ID_ASSISTANT], $userRoles ?: [])) {
-            fatalError('Unauthorized');
+            DetailedLogHelper::logError('Unauthorized exportCsv attempt', new \Exception('Unauthorized'));
+            header('HTTP/1.1 403 Forbidden');
+            echo 'Unauthorized';
+            exit;
         }
 
         try {
@@ -495,7 +498,10 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
 
         $userRoles = $this->getAuthorizedContextObject(Application::ASSOC_TYPE_USER_ROLES);
         if (!array_intersect([Role::ROLE_ID_MANAGER, Role::ROLE_ID_SITE_ADMIN, Role::ROLE_ID_SUB_EDITOR, Role::ROLE_ID_ASSISTANT], $userRoles ?: [])) {
-            fatalError('Unauthorized');
+            DetailedLogHelper::logError('Unauthorized exportJson attempt', new \Exception('Unauthorized'));
+            header('HTTP/1.1 403 Forbidden');
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
         }
 
         try {
@@ -632,7 +638,10 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             }
 
             if (!$fileId) {
-                fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileNotFound', [], 'File identifier not specified or invalid.'));
+                DetailedLogHelper::logError('downloadFile error: file ID not specified', new \Exception('File ID missing'));
+                header('HTTP/1.1 404 Not Found');
+                echo 'File identifier not specified or invalid.';
+                exit;
             }
 
             // Anonymization protection for author users
@@ -645,7 +654,10 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
                             ReviewAssignment::SUBMISSION_REVIEW_METHOD_ANONYMOUS,
                             ReviewAssignment::SUBMISSION_REVIEW_METHOD_DOUBLEANONYMOUS
                         ])) {
-                            fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileAccessDeniedAnonymized', [], 'Access to this file is restricted to preserve reviewer anonymity.'));
+                            DetailedLogHelper::logError('downloadFile restricted: reviewer anonymity', new \Exception('Anonymized file access'));
+                            header('HTTP/1.1 403 Forbidden');
+                            echo 'Access to this file is restricted to preserve reviewer anonymity.';
+                            exit;
                         }
                     }
                 }
@@ -655,18 +667,27 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             if ($submissionFileId && $submissionId) {
                 $subFile = Repo::submissionFile()->get($submissionFileId);
                 if ($subFile && $subFile->getData('submissionId') != $submissionId) {
-                    fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileAccessDenied', [], 'Access denied: File does not belong to this submission.'));
+                    DetailedLogHelper::logError('downloadFile access denied: file does not belong to submission', new \Exception('Access denied'));
+                    header('HTTP/1.1 403 Forbidden');
+                    echo 'Access denied: File does not belong to this submission.';
+                    exit;
                 }
             }
 
             $fileService = app()->get('file');
             $fileRecord = $fileService->get($fileId);
             if (!$fileRecord) {
-                fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileNotFoundDb', [], 'The requested file record was not found in the database.'));
+                DetailedLogHelper::logError("downloadFile not found in DB: fileId {$fileId}", new \Exception('File not found in DB'));
+                header('HTTP/1.1 404 Not Found');
+                echo 'The requested file record was not found in the database.';
+                exit;
             }
 
             if (!$fileService->fs->has($fileRecord->path)) {
-                fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileNotFoundDisk', [], 'The requested file was found in the database records, but the physical file is missing from the server files directory.'));
+                DetailedLogHelper::logError("downloadFile missing on disk: fileId {$fileId}, path {$fileRecord->path}", new \Exception('File missing on disk'));
+                header('HTTP/1.1 404 Not Found');
+                echo 'The requested file was found in the database records, but the physical file is missing from the server files directory.';
+                exit;
             }
 
             if (is_array($filename)) {
@@ -678,7 +699,9 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             $fileService->download((int) $fileId, $filename);
         } catch (\Throwable $e) {
             DetailedLogHelper::logError('Error downloading file in DetailedSubmissionEventLogGridHandler', $e);
-            fatalError('Unable to download requested file.');
+            header('HTTP/1.1 500 Internal Server Error');
+            echo 'Unable to download requested file.';
+            exit;
         }
     }
 }

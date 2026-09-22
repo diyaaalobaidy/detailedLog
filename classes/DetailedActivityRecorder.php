@@ -160,19 +160,28 @@ class DetailedActivityRecorder
     /**
      * Mark an event as handled by high-level domain hook to avoid duplicate DB query log
      */
-    public static function markHandled(string $table, string|int $recordId, string $operation): void
+    public static function markHandled(string $table, mixed $recordId, string $operation): void
     {
-        $key = strtolower("{$table}:{$recordId}:{$operation}");
-        self::$handledEvents[$key] = microtime(true);
+        try {
+            $recIdStr = is_scalar($recordId) ? (string)$recordId : json_encode($recordId);
+            $key = strtolower("{$table}:{$recIdStr}:{$operation}");
+            self::$handledEvents[$key] = microtime(true);
+        } catch (\Throwable) {
+        }
     }
 
     /**
      * Check whether an event was already handled in the current request
      */
-    public static function isHandled(string $table, string|int $recordId, string $operation): bool
+    public static function isHandled(string $table, mixed $recordId, string $operation): bool
     {
-        $key = strtolower("{$table}:{$recordId}:{$operation}");
-        return isset(self::$handledEvents[$key]);
+        try {
+            $recIdStr = is_scalar($recordId) ? (string)$recordId : json_encode($recordId);
+            $key = strtolower("{$table}:{$recIdStr}:{$operation}");
+            return isset(self::$handledEvents[$key]);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -293,14 +302,14 @@ class DetailedActivityRecorder
     /**
      * Intercept and process raw queries executed on database
      */
-    public static function handleQuery(QueryExecuted $query): void
+    public static function handleQuery(mixed $query): void
     {
-        if (self::$isLogging) {
+        if (self::$isLogging || !is_object($query) || !isset($query->sql)) {
             return;
         }
 
         try {
-            $sql = $query->sql;
+            $sql = (string)$query->sql;
             $firstWord = strtolower(strtok(ltrim($sql), " \t\n\r"));
             if (!in_array($firstWord, ['insert', 'update', 'delete', 'replace'])) {
                 return;
@@ -465,12 +474,13 @@ class DetailedActivityRecorder
 
     // --- Domain Hook Listeners ---
 
-    public static function onPublicationEdit(string $hookName, array $params): bool
+    public static function onPublicationEdit(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newPublication = $params[0] ?? null;
             $oldPublication = $params[1] ?? null;
-            $changes = $params[2] ?? [];
+            $changes = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
 
             if (!$newPublication instanceof Publication) {
                 return Hook::CONTINUE;
@@ -513,9 +523,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onPublicationPublish(string $hookName, array $params): bool
+    public static function onPublicationPublish(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newPublication = $params[0] ?? null;
             if (!$newPublication instanceof Publication) {
                 return Hook::CONTINUE;
@@ -543,9 +554,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onPublicationUnpublish(string $hookName, array $params): bool
+    public static function onPublicationUnpublish(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $publication = $params[0] ?? null;
             if (!$publication instanceof Publication) {
                 return Hook::CONTINUE;
@@ -572,9 +584,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onPublicationVersion(string $hookName, array $params): bool
+    public static function onPublicationVersion(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newPublication = $params[0] ?? null;
             $oldPublication = $params[1] ?? null;
 
@@ -604,9 +617,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onAuthorAdd(string $hookName, array $params): bool
+    public static function onAuthorAdd(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $author = $params[0] ?? null;
             if (!$author instanceof Author) {
                 return Hook::CONTINUE;
@@ -639,9 +653,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onAuthorEdit(string $hookName, array $params): bool
+    public static function onAuthorEdit(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newAuthor = $params[0] ?? null;
             $oldAuthor = $params[1] ?? null;
             $changes = $params[2] ?? [];
@@ -666,11 +681,13 @@ class DetailedActivityRecorder
                 'submissionId' => $submissionId,
             ];
 
-            foreach ($changes as $key => $val) {
-                $oldVal = $oldAuthor ? $oldAuthor->getData($key) : null;
-                $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
-                if ($oldVal !== null) {
-                    $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+            if (is_array($changes)) {
+                foreach ($changes as $key => $val) {
+                    $oldVal = $oldAuthor ? $oldAuthor->getData($key) : null;
+                    $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
+                    if ($oldVal !== null) {
+                        $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+                    }
                 }
             }
 
@@ -682,9 +699,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onAuthorDelete(string $hookName, array $params): bool
+    public static function onAuthorDelete(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $author = $params[0] ?? null;
             if (!$author instanceof Author) {
                 return Hook::CONTINUE;
@@ -715,9 +733,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onSubmissionEdit(string $hookName, array $params): bool
+    public static function onSubmissionEdit(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newSubmission = $params[0] ?? null;
             $oldSubmission = $params[1] ?? null;
             $changes = $params[2] ?? [];
@@ -736,16 +755,18 @@ class DetailedActivityRecorder
             ];
 
             $changedKeys = [];
-            foreach ($changes as $key => $val) {
-                if (in_array($key, ['lastModified', 'updated_at'])) {
-                    continue;
+            if (is_array($changes)) {
+                foreach ($changes as $key => $val) {
+                    if (in_array($key, ['lastModified', 'updated_at'])) {
+                        continue;
+                    }
+                    $oldVal = $oldSubmission ? $oldSubmission->getData($key) : null;
+                    $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
+                    if ($oldVal !== null) {
+                        $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+                    }
+                    $changedKeys[] = $key;
                 }
-                $oldVal = $oldSubmission ? $oldSubmission->getData($key) : null;
-                $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
-                if ($oldVal !== null) {
-                    $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
-                }
-                $changedKeys[] = $key;
             }
 
             if (empty($changedKeys)) {
@@ -761,9 +782,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onSubmissionFileAdd(string $hookName, array $params): bool
+    public static function onSubmissionFileAdd(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $file = $params[0] ?? null;
             if (!$file instanceof SubmissionFile) {
                 return Hook::CONTINUE;
@@ -794,9 +816,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onSubmissionFileEdit(string $hookName, array $params): bool
+    public static function onSubmissionFileEdit(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newFile = $params[0] ?? null;
             $oldFile = $params[1] ?? null;
             $changes = $params[2] ?? [];
@@ -821,11 +844,13 @@ class DetailedActivityRecorder
                 'submissionId' => $submissionId,
             ];
 
-            foreach ($changes as $key => $val) {
-                $oldVal = $oldFile ? $oldFile->getData($key) : null;
-                $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
-                if ($oldVal !== null) {
-                    $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+            if (is_array($changes)) {
+                foreach ($changes as $key => $val) {
+                    $oldVal = $oldFile ? $oldFile->getData($key) : null;
+                    $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
+                    if ($oldVal !== null) {
+                        $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+                    }
                 }
             }
 
@@ -837,9 +862,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onSubmissionFileDelete(string $hookName, array $params): bool
+    public static function onSubmissionFileDelete(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $file = $params[0] ?? null;
             if (!$file instanceof SubmissionFile) {
                 return Hook::CONTINUE;
@@ -870,9 +896,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onReviewAssignmentAdd(string $hookName, array $params): bool
+    public static function onReviewAssignmentAdd(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $reviewAssignment = $params[0] ?? null;
             if (!$reviewAssignment instanceof ReviewAssignment) {
                 return Hook::CONTINUE;
@@ -908,9 +935,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onReviewAssignmentEdit(string $hookName, array $params): bool
+    public static function onReviewAssignmentEdit(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $newReview = $params[0] ?? null;
             $oldReview = $params[1] ?? null;
             $changes = $params[2] ?? [];
@@ -937,11 +965,13 @@ class DetailedActivityRecorder
                 'submissionId' => $submissionId,
             ];
 
-            foreach ($changes as $key => $val) {
-                $oldVal = $oldReview ? $oldReview->getData($key) : null;
-                $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
-                if ($oldVal !== null) {
-                    $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+            if (is_array($changes)) {
+                foreach ($changes as $key => $val) {
+                    $oldVal = $oldReview ? $oldReview->getData($key) : null;
+                    $settings["field:{$key}"] = is_scalar($val) ? (string)$val : json_encode($val, JSON_UNESCAPED_UNICODE);
+                    if ($oldVal !== null) {
+                        $settings["previous:{$key}"] = is_scalar($oldVal) ? (string)$oldVal : json_encode($oldVal, JSON_UNESCAPED_UNICODE);
+                    }
                 }
             }
 
@@ -953,9 +983,10 @@ class DetailedActivityRecorder
         return Hook::CONTINUE;
     }
 
-    public static function onReviewAssignmentDelete(string $hookName, array $params): bool
+    public static function onReviewAssignmentDelete(string $hookName, mixed ...$args): bool
     {
         try {
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
             $reviewAssignment = $params[0] ?? null;
             if (!$reviewAssignment instanceof ReviewAssignment) {
                 return Hook::CONTINUE;
@@ -989,9 +1020,13 @@ class DetailedActivityRecorder
 
     // --- Eloquent Model Observers ---
 
-    public static function onStageAssignmentSaved(StageAssignment $assignment): void
+    public static function onStageAssignmentSaved(mixed $assignment): void
     {
         try {
+            if (!$assignment instanceof StageAssignment) {
+                return;
+            }
+
             $submissionId = (int)$assignment->submissionId;
             if (!$submissionId) {
                 return;
@@ -1024,9 +1059,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onStageAssignmentDeleted(StageAssignment $assignment): void
+    public static function onStageAssignmentDeleted(mixed $assignment): void
     {
         try {
+            if (!$assignment instanceof StageAssignment) {
+                return;
+            }
+
             $submissionId = (int)$assignment->submissionId;
             if (!$submissionId) {
                 return;
@@ -1057,9 +1096,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onQuerySaved(Query $query): void
+    public static function onQuerySaved(mixed $query): void
     {
         try {
+            if (!$query instanceof Query) {
+                return;
+            }
+
             if ((int)$query->assocType !== PKPApplication::ASSOC_TYPE_SUBMISSION) {
                 return;
             }
@@ -1086,9 +1129,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onQueryDeleted(Query $query): void
+    public static function onQueryDeleted(mixed $query): void
     {
         try {
+            if (!$query instanceof Query) {
+                return;
+            }
+
             if ((int)$query->assocType !== PKPApplication::ASSOC_TYPE_SUBMISSION) {
                 return;
             }
@@ -1112,9 +1159,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onQueryParticipantSaved(QueryParticipant $participant): void
+    public static function onQueryParticipantSaved(mixed $participant): void
     {
         try {
+            if (!$participant instanceof QueryParticipant) {
+                return;
+            }
+
             $queryId = (int)$participant->queryId;
             $submissionId = self::lookupSubmissionFromQueryId($queryId);
             if (!$submissionId) {
@@ -1140,9 +1191,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onQueryParticipantDeleted(QueryParticipant $participant): void
+    public static function onQueryParticipantDeleted(mixed $participant): void
     {
         try {
+            if (!$participant instanceof QueryParticipant) {
+                return;
+            }
+
             $queryId = (int)$participant->queryId;
             $submissionId = self::lookupSubmissionFromQueryId($queryId);
             if (!$submissionId) {
@@ -1168,9 +1223,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onNoteSaved(Note $note): void
+    public static function onNoteSaved(mixed $note): void
     {
         try {
+            if (!$note instanceof Note) {
+                return;
+            }
+
             $assocType = (int)$note->assocType;
             $assocId = (int)$note->assocId;
             $submissionId = null;
@@ -1212,9 +1271,13 @@ class DetailedActivityRecorder
         }
     }
 
-    public static function onNoteDeleted(Note $note): void
+    public static function onNoteDeleted(mixed $note): void
     {
         try {
+            if (!$note instanceof Note) {
+                return;
+            }
+
             $assocType = (int)$note->assocType;
             $assocId = (int)$note->assocId;
             $submissionId = null;

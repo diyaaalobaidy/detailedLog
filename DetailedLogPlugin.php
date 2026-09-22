@@ -122,29 +122,28 @@ class DetailedLogPlugin extends GenericPlugin
     /**
      * Intercept component requests to replace standard event log grid with our detailed handler
      */
-    public function handleComponentRouting(string $hookName, array $params): bool
+    public function handleComponentRouting(string $hookName, mixed ...$args): bool
     {
         try {
-            $component = &$params[0];
-            $op = &$params[1];
-            $componentInstance = &$params[2];
+            if (isset($args[0]) && is_array($args[0])) {
+                $params = &$args[0];
+                $component = &$params[0];
+                $op = &$params[1];
+                $componentInstance = &$params[2];
+            } else {
+                $component = &$args[0];
+                $op = &$args[1];
+                $componentInstance = &$args[2];
+            }
 
-            if ($component === 'grid.eventLog.SubmissionEventLogGridHandler') {
+            if ($component === 'grid.eventLog.SubmissionEventLogGridHandler'
+                || $component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionEventLogGridHandler') {
                 $componentInstance = new DetailedSubmissionEventLogGridHandler($this);
                 return Hook::ABORT;
             }
 
-            if ($component === 'grid.eventLog.SubmissionFileEventLogGridHandler') {
-                $componentInstance = new DetailedSubmissionFileEventLogGridHandler($this);
-                return Hook::ABORT;
-            }
-
-            if ($component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionEventLogGridHandler') {
-                $componentInstance = new DetailedSubmissionEventLogGridHandler($this);
-                return Hook::ABORT;
-            }
-
-            if ($component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionFileEventLogGridHandler') {
+            if ($component === 'grid.eventLog.SubmissionFileEventLogGridHandler'
+                || $component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionFileEventLogGridHandler') {
                 $componentInstance = new DetailedSubmissionFileEventLogGridHandler($this);
                 return Hook::ABORT;
             }
@@ -158,17 +157,23 @@ class DetailedLogPlugin extends GenericPlugin
     /**
      * Inject custom CSS stylesheet into the template manager
      */
-    public function setupStylesheet(string $hookName, array $args): bool
+    public function setupStylesheet(string $hookName, mixed ...$args): bool
     {
         try {
-            $templateMgr = $args[0]; /** @var TemplateManager $templateMgr */
-            $request = Application::get()->getRequest();
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
+            $templateMgr = $params[0] ?? null;
+            if (!$templateMgr instanceof TemplateManager) {
+                $templateMgr = TemplateManager::getManager(Application::get()->getRequest());
+            }
 
-            $templateMgr->addStyleSheet(
-                'detailedLogPluginCss',
-                $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
-                ['contexts' => ['backend']]
-            );
+            if ($templateMgr) {
+                $request = Application::get()->getRequest();
+                $templateMgr->addStyleSheet(
+                    'detailedLogPluginCss',
+                    $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
+                    ['contexts' => ['backend']]
+                );
+            }
         } catch (\Throwable $e) {
             DetailedLogHelper::logError('Error in setupStylesheet', $e);
         }
@@ -179,19 +184,20 @@ class DetailedLogPlugin extends GenericPlugin
     /**
      * Grid features callback fallback
      */
-    public function handleGridFeatures(string $hookName, array $args): bool
+    public function handleGridFeatures(string $hookName, mixed ...$args): bool
     {
         try {
-            $grid = $args[0];
-            $request = $args[1];
+            $params = (isset($args[0]) && is_array($args[0])) ? $args[0] : $args;
+            $request = $params[1] ?? Application::get()->getRequest();
 
-            // Ensure stylesheet is added when grid is rendered
-            $templateMgr = TemplateManager::getManager($request);
-            $templateMgr->addStyleSheet(
-                'detailedLogPluginCss',
-                $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
-                ['contexts' => ['backend']]
-            );
+            if ($request) {
+                $templateMgr = TemplateManager::getManager($request);
+                $templateMgr?->addStyleSheet(
+                    'detailedLogPluginCss',
+                    $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
+                    ['contexts' => ['backend']]
+                );
+            }
         } catch (\Throwable $e) {
             DetailedLogHelper::logError('Error in handleGridFeatures', $e);
         }
