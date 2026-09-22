@@ -13,7 +13,6 @@
 	<type>plugins.generic</type>
 	<release>1.0.0.0</release>
 	<date>2026-09-22</date>
-	<sitewide>1</sitewide>
-	<lazy-load>0</lazy-load>
+	<lazy-load>1</lazy-load>
 	<class>DetailedLogPlugin</class>
 </version>

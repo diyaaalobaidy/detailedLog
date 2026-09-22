@@ -47,52 +47,6 @@ class DetailedLogPlugin extends GenericPlugin
     }
 
     /**
-     * Site-wide plugin mandatory on all journals
-     *
-     * @copydoc Plugin::isSitePlugin()
-     */
-    public function isSitePlugin()
-    {
-        return true;
-    }
-
-    /**
-     * Mandatory plugin: Always enabled across all journals
-     *
-     * @copydoc LazyLoadPlugin::getEnabled()
-     */
-    public function getEnabled($contextId = null)
-    {
-        return true;
-    }
-
-    /**
-     * Mandatory plugin: Cannot be disabled
-     *
-     * @copydoc LazyLoadPlugin::setEnabled()
-     */
-    public function setEnabled($enabled)
-    {
-        // Mandatory plugin: Cannot be disabled
-    }
-
-    /**
-     * @copydoc Plugin::getCanEnable()
-     */
-    public function getCanEnable()
-    {
-        return false;
-    }
-
-    /**
-     * @copydoc Plugin::getCanDisable()
-     */
-    public function getCanDisable()
-    {
-        return false;
-    }
-
-    /**
      * @copydoc Plugin::register()
      */
     public function register($category, $path, $mainContextId = null)
@@ -103,18 +57,19 @@ class DetailedLogPlugin extends GenericPlugin
                 \PKP\facades\Locale::registerPath($localePath);
             }
 
-            // Mandatory audit plugin: Always active across all contexts/journals
-            classes\DetailedActivityRecorder::init();
+            if ($this->getEnabled($mainContextId)) {
+                // Initialize universal database activity & lifecycle recorder
+                classes\DetailedActivityRecorder::init();
 
-            // Intercept component routing for Submission Event Log grids
-            Hook::add('LoadComponentHandler', $this->handleComponentRouting(...));
+                // Intercept component routing for Submission Event Log grids
+                Hook::add('LoadComponentHandler', $this->handleComponentRouting(...));
 
-            // Add stylesheet to backend templates
-            Hook::add('TemplateManager::display', $this->setupStylesheet(...));
+                // Add stylesheet to backend templates
+                Hook::add('TemplateManager::display', $this->setupStylesheet(...));
 
-            // Fallback hook if grid is initialized directly
-            Hook::add('submissioneventloggridhandler::initfeatures', $this->handleGridFeatures(...));
-
+                // Fallback hook if grid is initialized directly
+                Hook::add('submissioneventloggridhandler::initfeatures', $this->handleGridFeatures(...));
+            }
             return true;
         }
         return false;
@@ -219,10 +174,6 @@ class DetailedLogPlugin extends GenericPlugin
     public function manage($args, $request)
     {
         $verb = $args['verb'] ?? null;
-        if ($verb === 'disable') {
-            return new JSONMessage(false, DetailedLogHelper::translate('plugins.generic.detailedLog.cannotBeDisabled', [], 'This plugin is mandatory across all journals and cannot be disabled.'));
-        }
-
         if ($verb === 'stats') {
             $totalEvents = DB::table('event_log')->count();
             $totalSettings = DB::table('event_log_settings')->count();
@@ -231,7 +182,6 @@ class DetailedLogPlugin extends GenericPlugin
             $html = '<div style="padding: 15px; font-size: 0.95em; line-height: 1.6;">';
             $html .= '<h3 style="margin-top: 0;">🔍 ' . htmlspecialchars($this->getDisplayName()) . '</h3>';
             $html .= '<p>' . htmlspecialchars($this->getDescription()) . '</p>';
-            $html .= '<div style="margin: 10px 0; padding: 8px 12px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 6px; color: #0369a1; font-weight: 600; font-size: 0.9em;">🔒 Mandatory Site-Wide Audit Plugin &mdash; Permanently active on all journals</div>';
             $html .= '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">';
             $html .= '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 15px;">';
             $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
@@ -247,7 +197,7 @@ class DetailedLogPlugin extends GenericPlugin
             $html .= '<small style="color: #64748b;">Distinct Setting Types</small>';
             $html .= '</div>';
             $html .= '</div>';
-            $html .= '<p style="color: #15803d; font-weight: 600;">✓ Universal Audit Recorder is active. Intercepts all database queries, domain lifecycle events, real client IPs, and HTTP request payloads.</p>';
+            $html .= '<p style="color: #15803d; font-weight: 600;">✓ Plugin is active. All Activity Logs automatically display complete detailed metadata and export options.</p>';
             $html .= '</div>';
 
             return new JSONMessage(true, $html);

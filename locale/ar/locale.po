@@ -300,8 +300,4 @@ msgstr "رابط الطلب (URL)"
 msgid "plugins.generic.detailedLog.card.requestBody"
 msgstr "محتوى الطلب والبيانات المرسلة"
 
-msgid "plugins.generic.detailedLog.cannotBeDisabled"
-msgstr "هذه الإضافة إلزامية لجميع المجلات ولا يمكن تعطيلها."
-
-
 
