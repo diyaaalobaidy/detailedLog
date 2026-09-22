@@ -249,3 +249,39 @@ msgstr "ملف التحكيم الداخلي"
 msgid "plugins.generic.detailedLog.fileStage.internalReviewRevision"
 msgstr "تعديل التحكيم الداخلي"
 
+msgid "plugins.generic.detailedLog.category.database"
+msgstr "نشاط قاعدة البيانات"
+
+msgid "plugins.generic.detailedLog.setting.tableName"
+msgstr "جدول قاعدة البيانات"
+
+msgid "plugins.generic.detailedLog.setting.operation"
+msgstr "عملية قاعدة البيانات"
+
+msgid "plugins.generic.detailedLog.setting.recordId"
+msgstr "معرف السجل"
+
+msgid "plugins.generic.detailedLog.setting.ipAddress"
+msgstr "عنوان IP للمستخدم"
+
+msgid "plugins.generic.detailedLog.setting.authorName"
+msgstr "اسم المساهم / المؤلف"
+
+msgid "plugins.generic.detailedLog.setting.authorId"
+msgstr "معرف المساهم"
+
+msgid "plugins.generic.detailedLog.setting.assignedUserName"
+msgstr "المستخدم المعين"
+
+msgid "plugins.generic.detailedLog.setting.assignedUserId"
+msgstr "معرف المستخدم المعين"
+
+msgid "plugins.generic.detailedLog.setting.noteTitle"
+msgstr "عنوان المناقشة"
+
+msgid "plugins.generic.detailedLog.setting.noteAuthor"
+msgstr "مرسل المناقشة"
+
+msgid "plugins.generic.detailedLog.setting.noteExcerpt"
+msgstr "مقتطف الرسالة"
+

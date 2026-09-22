@@ -249,3 +249,39 @@ msgstr "Internal Review File"
 msgid "plugins.generic.detailedLog.fileStage.internalReviewRevision"
 msgstr "Internal Review Revision"
 
+msgid "plugins.generic.detailedLog.category.database"
+msgstr "Database Activity"
+
+msgid "plugins.generic.detailedLog.setting.tableName"
+msgstr "Database Table"
+
+msgid "plugins.generic.detailedLog.setting.operation"
+msgstr "Database Operation"
+
+msgid "plugins.generic.detailedLog.setting.recordId"
+msgstr "Record ID"
+
+msgid "plugins.generic.detailedLog.setting.ipAddress"
+msgstr "Client IP Address"
+
+msgid "plugins.generic.detailedLog.setting.authorName"
+msgstr "Contributor Name"
+
+msgid "plugins.generic.detailedLog.setting.authorId"
+msgstr "Contributor ID"
+
+msgid "plugins.generic.detailedLog.setting.assignedUserName"
+msgstr "Assigned User"
+
+msgid "plugins.generic.detailedLog.setting.assignedUserId"
+msgstr "Assigned User ID"
+
+msgid "plugins.generic.detailedLog.setting.noteTitle"
+msgstr "Discussion Subject"
+
+msgid "plugins.generic.detailedLog.setting.noteAuthor"
+msgstr "Posted By"
+
+msgid "plugins.generic.detailedLog.setting.noteExcerpt"
+msgstr "Message Preview"
+

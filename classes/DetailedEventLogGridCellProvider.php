@@ -296,6 +296,46 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
             $parts[] = $commText;
         }
 
+        // 6. Contributor highlights
+        if (!empty($highlights['contributor'])) {
+            $co = $highlights['contributor'];
+            $coText = 'Contributor: ' . $co['authorName'];
+            if (!empty($co['email'])) {
+                $coText .= ' <' . $co['email'] . '>';
+            }
+            $parts[] = $coText;
+        }
+
+        // 7. Discussion / Note highlights
+        if (!empty($highlights['discussion'])) {
+            $disc = $highlights['discussion'];
+            $discText = 'Note by ' . ($disc['author'] ?: 'User');
+            if (!empty($disc['title'])) {
+                $discText .= ': ' . $disc['title'];
+            } elseif (!empty($disc['excerpt'])) {
+                $discText .= ': ' . $disc['excerpt'];
+            }
+            $parts[] = $discText;
+        }
+
+        // 8. Database activity highlights
+        if (!empty($highlights['database'])) {
+            $db = $highlights['database'];
+            $dbText = $db['tableName'] . ' [' . $db['operation'] . ']';
+            if (!empty($db['fields'])) {
+                $fieldSummary = [];
+                foreach ($db['fields'] as $fn => $fv) {
+                    $fvStr = (string)$fv;
+                    if (mb_strlen($fvStr) > 35) {
+                        $fvStr = mb_substr($fvStr, 0, 32) . '...';
+                    }
+                    $fieldSummary[] = "{$fn}={$fvStr}";
+                }
+                $dbText .= ' (' . implode(', ', array_slice($fieldSummary, 0, 3)) . ')';
+            }
+            $parts[] = $dbText;
+        }
+
         // If no structured highlights were extracted, show key raw settings
         if (empty($parts) && !empty($rawSettings)) {
             $settingPairs = [];

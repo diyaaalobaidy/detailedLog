@@ -58,6 +58,9 @@ class DetailedLogPlugin extends GenericPlugin
             }
 
             if ($this->getEnabled($mainContextId)) {
+                // Initialize universal database activity & lifecycle recorder
+                classes\DetailedActivityRecorder::init();
+
                 // Intercept component routing for Submission Event Log grids
                 Hook::add('LoadComponentHandler', $this->handleComponentRouting(...));
 

@@ -119,6 +119,12 @@
     border: 1px solid #e2e8f0;
 }
 
+.badge-database {
+    background-color: #f8fafc;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+}
+
 .badge-stage {
     background-color: #f1f5f9;
     color: #475569;

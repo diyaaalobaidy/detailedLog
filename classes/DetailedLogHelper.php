@@ -80,6 +80,15 @@ class DetailedLogHelper
         $message = $entry->getMessage();
         $eventType = $entry->getEventType();
 
+        if (str_starts_with($message, 'Database Activity:') || str_contains($message, 'Database Activity') || ($eventType >= 0x70000001 && $eventType <= 0x70000003)) {
+            return [
+                'category' => 'database',
+                'name' => self::translate('plugins.generic.detailedLog.category.database', [], 'Database Activity'),
+                'icon' => '🗄️',
+                'badgeClass' => 'badge-database',
+            ];
+        }
+
         if (str_starts_with($message, 'log.editor.decision') || str_starts_with($message, 'log.editor.recommendation')) {
             return [
                 'category' => 'decision',
@@ -89,7 +98,7 @@ class DetailedLogHelper
             ];
         }
 
-        if (str_starts_with($message, 'log.review.')) {
+        if (str_starts_with($message, 'log.review.') || str_contains($message, 'Reviewer Assigned') || str_contains($message, 'Review Assignment')) {
             return [
                 'category' => 'review',
                 'name' => self::translate('plugins.generic.detailedLog.category.review', [], 'Peer Review'),
@@ -98,7 +107,7 @@ class DetailedLogHelper
             ];
         }
 
-        if (str_starts_with($message, 'submission.event.file') || str_starts_with($message, 'submission.event.revision')) {
+        if (str_starts_with($message, 'submission.event.file') || str_starts_with($message, 'submission.event.revision') || str_starts_with($message, 'File Added') || str_starts_with($message, 'File Modified') || str_starts_with($message, 'File Deleted')) {
             return [
                 'category' => 'file',
                 'name' => self::translate('plugins.generic.detailedLog.category.file', [], 'File Activities'),
@@ -107,7 +116,7 @@ class DetailedLogHelper
             ];
         }
 
-        if (str_starts_with($message, 'submission.event.participant')) {
+        if (str_starts_with($message, 'submission.event.participant') || str_starts_with($message, 'Participant Assigned') || str_starts_with($message, 'Participant Removed')) {
             return [
                 'category' => 'participant',
                 'name' => self::translate('plugins.generic.detailedLog.category.participant', [], 'Participants'),
@@ -116,7 +125,7 @@ class DetailedLogHelper
             ];
         }
 
-        if (str_starts_with($message, 'publication.event.')) {
+        if (str_starts_with($message, 'publication.event.') || str_starts_with($message, 'Publication Metadata') || str_starts_with($message, 'Publication Published') || str_starts_with($message, 'Publication Unpublished') || str_starts_with($message, 'New Publication Version')) {
             return [
                 'category' => 'publication',
                 'name' => self::translate('plugins.generic.detailedLog.category.publication', [], 'Publications'),
@@ -125,7 +134,7 @@ class DetailedLogHelper
             ];
         }
 
-        if (str_starts_with($message, 'informationCenter.')) {
+        if (str_starts_with($message, 'informationCenter.') || str_starts_with($message, 'Discussion') || str_contains($message, 'Discussion Note')) {
             return [
                 'category' => 'communication',
                 'name' => self::translate('plugins.generic.detailedLog.category.communication', [], 'Discussions'),
@@ -134,10 +143,10 @@ class DetailedLogHelper
             ];
         }
 
-        if (str_contains($message, 'metadata')) {
+        if (str_contains($message, 'metadata') || str_starts_with($message, 'Contributor')) {
             return [
                 'category' => 'metadata',
-                'name' => self::translate('plugins.generic.detailedLog.category.metadata', [], 'Metadata'),
+                'name' => self::translate('plugins.generic.detailedLog.category.metadata', [], 'Metadata & Contributors'),
                 'icon' => '📝',
                 'badgeClass' => 'badge-metadata',
             ];
@@ -323,6 +332,18 @@ class DetailedLogHelper
             'recipientId' => 'Recipient ID',
             'recipientCount' => 'Recipient Count',
             'copyrightNotice' => 'Copyright Notice',
+            'tableName' => 'Database Table',
+            'operation' => 'Database Operation',
+            'recordId' => 'Record ID',
+            'ipAddress' => 'Client IP Address',
+            'authorName' => 'Contributor Name',
+            'authorId' => 'Contributor ID',
+            'assignedUserName' => 'Assigned User',
+            'assignedUserId' => 'Assigned User ID',
+            'publicationId' => 'Publication ID',
+            'noteTitle' => 'Discussion Subject',
+            'noteAuthor' => 'Posted By',
+            'noteExcerpt' => 'Message Preview',
         ];
 
         $label = isset($defaultLabels[$name])
@@ -332,46 +353,77 @@ class DetailedLogHelper
         $interpreted = $value;
         $category = 'general';
 
-        switch ($name) {
-            case 'fileStage':
-                $interpreted = self::formatFileStage((int)$value) . " (Code {$value})";
-                $category = 'file';
-                break;
-            case 'stageId':
-                $interpreted = self::formatStageId((int)$value) . " (Stage {$value})";
-                $category = 'workflow';
-                break;
-            case 'round':
-                $interpreted = self::translate('submission.round', ['round' => $value], "Round {$value}");
-                $category = 'review';
-                break;
-            case 'filename':
-            case 'fileId':
-            case 'submissionFileId':
-            case 'sourceSubmissionFileId':
-                $category = 'file';
-                break;
-            case 'decision':
-            case 'editorName':
-            case 'editorId':
-                $category = 'decision';
-                break;
-            case 'reviewerName':
-            case 'reviewAssignmentId':
-            case 'reviewDueDate':
-                $category = 'review';
-                break;
-            case 'userFullName':
-            case 'userGroupName':
-            case 'username':
-            case 'userId':
-                $category = 'user';
-                break;
-            case 'subject':
-            case 'senderName':
-            case 'recipientName':
-                $category = 'communication';
-                break;
+        if (str_starts_with($name, 'field:')) {
+            $fieldName = substr($name, 6);
+            $label = 'Field: ' . ucwords(str_replace('_', ' ', $fieldName));
+            $category = 'database';
+        } elseif (str_starts_with($name, 'previous:')) {
+            $fieldName = substr($name, 9);
+            $label = 'Previous: ' . ucwords(str_replace('_', ' ', $fieldName));
+            $category = 'database';
+        } elseif (str_starts_with($name, 'where:')) {
+            $fieldName = substr($name, 6);
+            $label = 'Condition: ' . ucwords(str_replace('_', ' ', $fieldName));
+            $category = 'database';
+        } else {
+            switch ($name) {
+                case 'tableName':
+                case 'operation':
+                case 'recordId':
+                    $category = 'database';
+                    break;
+                case 'fileStage':
+                    $interpreted = self::formatFileStage((int)$value) . " (Code {$value})";
+                    $category = 'file';
+                    break;
+                case 'stageId':
+                    $interpreted = self::formatStageId((int)$value) . " (Stage {$value})";
+                    $category = 'workflow';
+                    break;
+                case 'round':
+                    $interpreted = self::translate('submission.round', ['round' => $value], "Round {$value}");
+                    $category = 'review';
+                    break;
+                case 'filename':
+                case 'fileId':
+                case 'submissionFileId':
+                case 'sourceSubmissionFileId':
+                    $category = 'file';
+                    break;
+                case 'decision':
+                case 'editorName':
+                case 'editorId':
+                    $category = 'decision';
+                    break;
+                case 'reviewerName':
+                case 'reviewAssignmentId':
+                case 'reviewDueDate':
+                    $category = 'review';
+                    break;
+                case 'userFullName':
+                case 'userGroupName':
+                case 'username':
+                case 'userId':
+                case 'ipAddress':
+                    $category = 'user';
+                    break;
+                case 'authorName':
+                case 'authorId':
+                    $category = 'metadata';
+                    break;
+                case 'assignedUserName':
+                case 'assignedUserId':
+                    $category = 'participant';
+                    break;
+                case 'subject':
+                case 'senderName':
+                case 'recipientName':
+                case 'noteTitle':
+                case 'noteAuthor':
+                case 'noteExcerpt':
+                    $category = 'communication';
+                    break;
+            }
         }
 
         return [
@@ -448,7 +500,12 @@ class DetailedLogHelper
             return $highlights;
         }
 
-        $data = $entry->getAllData();
+        $rawSettings = self::getRawSettings($entry->getId());
+        $settingsMap = [];
+        foreach ($rawSettings as $s) {
+            $settingsMap[$s['name']] = $s['value'];
+        }
+        $data = array_merge($entry->getAllData(), $settingsMap);
 
         // Check for stageId
         if (!empty($data['stageId'])) {
@@ -520,16 +577,52 @@ class DetailedLogHelper
         }
 
         // Check for participant details
-        if (!empty($data['userGroupName']) || (!empty($data['userFullName']) && str_contains($entry->getMessage(), 'participant'))) {
+        if (!empty($data['assignedUserName']) || !empty($data['userGroupName']) || (!empty($data['userFullName']) && str_contains($entry->getMessage(), 'participant'))) {
             $userGroupName = $data['userGroupName'] ?? '';
             if (is_array($userGroupName)) {
                 $userGroupName = current($userGroupName);
             }
 
             $highlights['participant'] = [
-                'fullName' => $data['userFullName'] ?? '',
+                'fullName' => $data['assignedUserName'] ?? $data['userFullName'] ?? '',
                 'username' => $data['username'] ?? '',
                 'userGroup' => $userGroupName,
+            ];
+        }
+
+        // Check for contributor details
+        if (!empty($data['authorName'])) {
+            $highlights['contributor'] = [
+                'authorName' => $data['authorName'],
+                'email' => $data['email'] ?? '',
+                'authorId' => $data['authorId'] ?? null,
+            ];
+        }
+
+        // Check for discussion / note details
+        if (!empty($data['noteAuthor']) || !empty($data['noteTitle']) || !empty($data['queryId'])) {
+            $highlights['discussion'] = [
+                'author' => $data['noteAuthor'] ?? '',
+                'title' => $data['noteTitle'] ?? '',
+                'excerpt' => $data['noteExcerpt'] ?? '',
+                'queryId' => $data['queryId'] ?? null,
+            ];
+        }
+
+        // Check for database activity details
+        if (!empty($data['tableName']) || !empty($data['operation'])) {
+            $rawSettings = self::getRawSettings($entry->getId());
+            $fields = [];
+            foreach ($rawSettings as $s) {
+                if (str_starts_with($s['name'], 'field:')) {
+                    $fields[substr($s['name'], 6)] = $s['value'];
+                }
+            }
+            $highlights['database'] = [
+                'tableName' => $data['tableName'] ?? '',
+                'operation' => $data['operation'] ?? '',
+                'recordId' => $data['recordId'] ?? null,
+                'fields' => $fields,
             ];
         }
 
