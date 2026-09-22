@@ -32,6 +32,8 @@ use PKP\log\EmailLogEntry;
 use PKP\log\event\EventLogEntry;
 use PKP\plugins\PluginRegistry;
 use PKP\security\Role;
+use PKP\submission\reviewAssignment\ReviewAssignment;
+use PKP\submissionFile\SubmissionFile;
 
 class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandler
 {
@@ -51,7 +53,7 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
 
         $this->addRoleAssignment(
             [Role::ROLE_ID_MANAGER, Role::ROLE_ID_SITE_ADMIN, Role::ROLE_ID_SUB_EDITOR, Role::ROLE_ID_ASSISTANT],
-            ['fetchGrid', 'fetchRow', 'viewEmail', 'viewLogDetails', 'exportCsv', 'exportJson']
+            ['fetchGrid', 'fetchRow', 'viewEmail', 'viewLogDetails', 'exportCsv', 'exportJson', 'downloadFile']
         );
     }
 
@@ -265,11 +267,21 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
     public function viewLogDetails($args, $request): JSONMessage
     {
         $logId = (int) ($args['logId'] ?? 0);
-        $submission = $this->getSubmission();
-
         $entry = Repo::eventLog()->get($logId);
         if (!$entry) {
             return new JSONMessage(false, __('plugins.generic.detailedLog.entryNotFound', [], 'Log entry not found.'));
+        }
+
+        $submission = $this->getSubmission();
+        $submissionId = $submission ? $submission->getId() : (int) ($args['submissionId'] ?? $request->getUserVar('submissionId') ?: $entry->getData('submissionId'));
+        if (!$submissionId && $entry->getAssocType() == Application::ASSOC_TYPE_SUBMISSION) {
+            $submissionId = (int) $entry->getAssocId();
+        }
+        if (!$submission && $submissionId) {
+            $submission = Repo::submission()->get($submissionId);
+            if ($submission) {
+                $this->setSubmission($submission);
+            }
         }
 
         $rawSettings = DetailedLogHelper::getRawSettings($logId);
@@ -301,11 +313,28 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             }
         }
 
+        $fileInfo = DetailedLogHelper::getFileInfoForLogEntry($entry, (bool) ($this->_isCurrentUserAssignedAuthor ?? false));
+        $fileDownloadUrl = null;
+        $filePhysicalExists = false;
+        if ($fileInfo && !empty($fileInfo['fileId'])) {
+            $router = $request->getRouter();
+            $downloadArgs = [
+                'submissionId' => $submissionId,
+                'logId' => $logId,
+                'fileId' => $fileInfo['fileId'],
+            ];
+            if (!empty($fileInfo['submissionFileId'])) {
+                $downloadArgs['submissionFileId'] = $fileInfo['submissionFileId'];
+            }
+            $fileDownloadUrl = $router->url($request, null, null, 'downloadFile', null, $downloadArgs);
+            $filePhysicalExists = !empty($fileInfo['filePath']) && app()->get('file')->fs->has($fileInfo['filePath']);
+        }
+
         $templateMgr->assign([
             'logEntry' => $entry,
             'logId' => $logId,
             'submission' => $submission,
-            'submissionId' => $submission->getId(),
+            'submissionId' => $submissionId,
             'eventCategory' => $category,
             'translatedMessage' => $entry->getTranslatedMessage(null, $this->_isCurrentUserAssignedAuthor),
             'userDetails' => $userDetails,
@@ -314,6 +343,9 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             'rawSettings' => $rawSettings,
             'interpretedSettings' => $interpretedSettings,
             'highlights' => $highlights,
+            'fileInfo' => $fileInfo,
+            'fileDownloadUrl' => $fileDownloadUrl,
+            'filePhysicalExists' => $filePhysicalExists,
             'isCurrentUserAssignedAuthor' => $this->_isCurrentUserAssignedAuthor,
             'allDataJson' => json_encode($entry->getAllData(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
         ]);
@@ -522,5 +554,94 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             'category' => $request->getUserVar('category'),
             'searchQuery' => $request->getUserVar('searchQuery'),
         ];
+    }
+
+    /**
+     * Download a file referenced in a submission event log entry
+     */
+    public function downloadFile($args, $request)
+    {
+        $submission = $this->getSubmission();
+        $submissionId = $submission ? $submission->getId() : (int) ($args['submissionId'] ?? $request->getUserVar('submissionId'));
+
+        $logId = (int) ($args['logId'] ?? $request->getUserVar('logId'));
+        $fileId = (int) ($args['fileId'] ?? $request->getUserVar('fileId'));
+        $submissionFileId = (int) ($args['submissionFileId'] ?? $request->getUserVar('submissionFileId'));
+        $filename = $args['filename'] ?? $request->getUserVar('filename');
+
+        // Resolve details from log entry if logId is provided
+        if ($logId) {
+            $entry = Repo::eventLog()->get($logId);
+            if ($entry) {
+                $fileInfo = DetailedLogHelper::getFileInfoForLogEntry($entry, (bool) ($this->_isCurrentUserAssignedAuthor ?? false));
+                if ($fileInfo) {
+                    $fileId = $fileId ?: $fileInfo['fileId'];
+                    $submissionFileId = $submissionFileId ?: $fileInfo['submissionFileId'];
+                    $filename = $filename ?: $fileInfo['filename'];
+                }
+            }
+        }
+
+        // Fallback resolution via submissionFileId
+        if (!$fileId && $submissionFileId) {
+            $subFile = Repo::submissionFile()->get($submissionFileId);
+            if ($subFile) {
+                $fileId = (int) $subFile->getData('fileId');
+                $filename = $filename ?: $subFile->getLocalizedData('name');
+            } else {
+                $subFileRow = \Illuminate\Support\Facades\DB::table('submission_files')
+                    ->where('submission_file_id', $submissionFileId)
+                    ->first();
+                if ($subFileRow) {
+                    $fileId = (int) $subFileRow->file_id;
+                }
+            }
+        }
+
+        if (!$fileId) {
+            fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileNotFound', [], 'File identifier not specified or invalid.'));
+        }
+
+        // Anonymization protection for author users
+        if ($this->_isCurrentUserAssignedAuthor && $submissionFileId) {
+            $subFile = Repo::submissionFile()->get($submissionFileId);
+            if ($subFile && $subFile->getData('fileStage') === SubmissionFile::SUBMISSION_FILE_REVIEW_ATTACHMENT) {
+                if ($subFile->getData('assocType') === Application::ASSOC_TYPE_REVIEW_ASSIGNMENT) {
+                    $reviewAssignment = Repo::reviewAssignment()->get($subFile->getData('assocId'));
+                    if ($reviewAssignment && in_array($reviewAssignment->getReviewMethod(), [
+                        ReviewAssignment::SUBMISSION_REVIEW_METHOD_ANONYMOUS,
+                        ReviewAssignment::SUBMISSION_REVIEW_METHOD_DOUBLEANONYMOUS
+                    ])) {
+                        fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileAccessDeniedAnonymized', [], 'Access to this file is restricted to preserve reviewer anonymity.'));
+                    }
+                }
+            }
+        }
+
+        // Verify submission ownership if submissionFileId is known
+        if ($submissionFileId && $submissionId) {
+            $subFile = Repo::submissionFile()->get($submissionFileId);
+            if ($subFile && $subFile->getData('submissionId') != $submissionId) {
+                fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileAccessDenied', [], 'Access denied: File does not belong to this submission.'));
+            }
+        }
+
+        $fileService = app()->get('file');
+        $fileRecord = $fileService->get($fileId);
+        if (!$fileRecord) {
+            fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileNotFoundDb', [], 'The requested file record was not found in the database.'));
+        }
+
+        if (!$fileService->fs->has($fileRecord->path)) {
+            fatalError(DetailedLogHelper::translate('plugins.generic.detailedLog.fileNotFoundDisk', [], 'The requested file was found in the database records, but the physical file is missing from the server files directory.'));
+        }
+
+        if (is_array($filename)) {
+            $filename = current($filename);
+        }
+        $filename = $filename ? (string) $filename : basename($fileRecord->path);
+        $filename = $fileService->formatFilename($fileRecord->path, $filename);
+
+        $fileService->download((int) $fileId, $filename);
     }
 }

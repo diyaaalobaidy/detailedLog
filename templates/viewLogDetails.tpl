@@ -37,36 +37,45 @@
 	{* Key Highlights Cards *}
 	<div class="detailed-log-highlights">
 		{* 1. File Details Card *}
-		{if $highlights.files && ($highlights.files.filename || $highlights.files.fileId)}
+		{if ($highlights.files && ($highlights.files.filename || $highlights.files.fileId)) || $fileInfo}
 			<div class="highlight-card card-file">
-				<div class="card-header">
-					<span class="card-icon">📁</span>
-					<h4>{translate key="plugins.generic.detailedLog.card.fileDetails"}</h4>
+				<div class="card-header card-header-with-action">
+					<div class="card-header-title">
+						<span class="card-icon">📁</span>
+						<h4>{translate key="plugins.generic.detailedLog.card.fileDetails"}</h4>
+					</div>
+					{if $fileDownloadUrl}
+						<div class="card-header-action">
+							<a href="{$fileDownloadUrl|escape}" class="pkp_button pkp_button_primary detailed-log-download-btn" target="_blank">
+								📥 {translate key="common.download"}
+							</a>
+						</div>
+					{/if}
 				</div>
 				<div class="card-body">
 					<div class="highlight-grid">
-						{if $highlights.files.filename}
+						{if $highlights.files.filename || ($fileInfo && $fileInfo.filename)}
 							<div class="highlight-item highlight-item-full">
 								<span class="item-label">{translate key="plugins.generic.detailedLog.setting.filename"}:</span>
-								<span class="item-value font-bold">{$highlights.files.filename|escape}</span>
+								<span class="item-value font-bold">{if $highlights.files.filename}{$highlights.files.filename|escape}{else}{$fileInfo.filename|escape}{/if}</span>
 							</div>
 						{/if}
-						{if $highlights.files.fileId}
+						{if $highlights.files.fileId || ($fileInfo && $fileInfo.fileId)}
 							<div class="highlight-item">
 								<span class="item-label">{translate key="plugins.generic.detailedLog.setting.fileId"}:</span>
-								<span class="item-value font-mono">{$highlights.files.fileId|escape}</span>
+								<span class="item-value font-mono">{if $highlights.files.fileId}{$highlights.files.fileId|escape}{else}{$fileInfo.fileId|escape}{/if}</span>
 							</div>
 						{/if}
-						{if $highlights.files.submissionFileId}
+						{if $highlights.files.submissionFileId || ($fileInfo && $fileInfo.submissionFileId)}
 							<div class="highlight-item">
 								<span class="item-label">{translate key="plugins.generic.detailedLog.setting.submissionFileId"}:</span>
-								<span class="item-value font-mono">{$highlights.files.submissionFileId|escape}</span>
+								<span class="item-value font-mono">{if $highlights.files.submissionFileId}{$highlights.files.submissionFileId|escape}{else}{$fileInfo.submissionFileId|escape}{/if}</span>
 							</div>
 						{/if}
-						{if $highlights.files.fileStageLabel}
+						{if $highlights.files.fileStageLabel || ($fileInfo && $fileInfo.fileStageLabel)}
 							<div class="highlight-item">
 								<span class="item-label">{translate key="plugins.generic.detailedLog.setting.fileStage"}:</span>
-								<span class="item-value"><span class="badge badge-filestage">{$highlights.files.fileStageLabel|escape}</span></span>
+								<span class="item-value"><span class="badge badge-filestage">{if $highlights.files.fileStageLabel}{$highlights.files.fileStageLabel|escape}{else}{$fileInfo.fileStageLabel|escape}{/if}</span></span>
 							</div>
 						{/if}
 						{if $highlights.files.sourceFileId}
@@ -76,6 +85,21 @@
 							</div>
 						{/if}
 					</div>
+					{if $fileDownloadUrl}
+						<div class="file-download-action-bar">
+							<a href="{$fileDownloadUrl|escape}" class="pkp_button pkp_button_primary detailed-log-download-btn-large" target="_blank">
+								📥 {translate key="plugins.generic.detailedLog.downloadFile"}
+								{if $highlights.files.filename || ($fileInfo && $fileInfo.filename)}
+									&mdash; <strong>{if $highlights.files.filename}{$highlights.files.filename|escape}{else}{$fileInfo.filename|escape}{/if}</strong>
+								{/if}
+							</a>
+							{if !$filePhysicalExists}
+								<span class="file-status-tag file-status-warning" title="{translate key="plugins.generic.detailedLog.filePhysicalMissingTip"}">⚠️ {translate key="plugins.generic.detailedLog.filePhysicalMissing"}</span>
+							{else}
+								<span class="file-status-tag file-status-ok">✓ {translate key="plugins.generic.detailedLog.fileReady"}</span>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}

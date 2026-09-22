@@ -300,4 +300,32 @@ msgstr "رابط الطلب (URL)"
 msgid "plugins.generic.detailedLog.card.requestBody"
 msgstr "محتوى الطلب والبيانات المرسلة"
 
+msgid "plugins.generic.detailedLog.downloadFile"
+msgstr "تحميل الملف"
+
+msgid "plugins.generic.detailedLog.fileReady"
+msgstr "جاهز للتحميل"
+
+msgid "plugins.generic.detailedLog.filePhysicalMissing"
+msgstr "الملف الفعلي غير متوفر على وحدة التخزين"
+
+msgid "plugins.generic.detailedLog.filePhysicalMissingTip"
+msgstr "سجل الملف موجود في قاعدة البيانات، لكن الملف الفعلي غير موجود على القرص."
+
+msgid "plugins.generic.detailedLog.fileNotFound"
+msgstr "معرف الملف غير محدد أو غير صالح."
+
+msgid "plugins.generic.detailedLog.fileNotFoundDb"
+msgstr "لم يتم العثور على سجل الملف في قاعدة البيانات."
+
+msgid "plugins.generic.detailedLog.fileNotFoundDisk"
+msgstr "تم العثور على سجل الملف، ولكن الملف الفعلي مفقود من مجلد الملفات على الخادم."
+
+msgid "plugins.generic.detailedLog.fileAccessDenied"
+msgstr "تم رفض الوصول: الملف لا ينتمي إلى هذه المقالة."
+
+msgid "plugins.generic.detailedLog.fileAccessDeniedAnonymized"
+msgstr "الوصول إلى هذا الملف مقيد لحماية سرية المراجعين."
+
+
 

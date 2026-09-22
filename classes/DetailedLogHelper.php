@@ -723,4 +723,103 @@ class DetailedLogHelper
             'email' => $email,
         ];
     }
+
+    /**
+     * Resolve file info (fileId, submissionFileId, filename, fileStage) for an event log entry.
+     * Returns null if the entry does not represent a file or access is restricted.
+     */
+    public static function getFileInfoForLogEntry(EventLogEntry|EmailLogEntry $entry, bool $isCurrentUserAuthor = false): ?array
+    {
+        if ($entry instanceof EmailLogEntry) {
+            return null;
+        }
+
+        $rawSettings = self::getRawSettings($entry->getId());
+        $settingsMap = [];
+        foreach ($rawSettings as $s) {
+            $settingsMap[$s['name']] = $s['value'];
+        }
+        $data = array_merge($entry->getAllData(), $settingsMap);
+
+        $fileId = !empty($data['fileId']) ? (int)$data['fileId'] : null;
+        $submissionFileId = !empty($data['submissionFileId']) ? (int)$data['submissionFileId'] : null;
+        if (!$submissionFileId && $entry->getAssocType() == Application::ASSOC_TYPE_SUBMISSION_FILE) {
+            $submissionFileId = (int)$entry->getAssocId();
+        }
+
+        $filename = '';
+        if (!empty($data['filename'])) {
+            $filename = is_array($data['filename']) ? current($data['filename']) : (string)$data['filename'];
+        }
+
+        $fileStage = isset($data['fileStage']) ? (int)$data['fileStage'] : null;
+
+        // If neither fileId nor submissionFileId is present, this entry is not a file operation
+        if (!$fileId && !$submissionFileId) {
+            return null;
+        }
+
+        // Anonymization protection: do not reveal anonymous review attachments to authors
+        if ($isCurrentUserAuthor) {
+            if ($fileStage === SubmissionFile::SUBMISSION_FILE_REVIEW_ATTACHMENT) {
+                return null;
+            }
+            if ($submissionFileId) {
+                $subFile = Repo::submissionFile()->get($submissionFileId);
+                if ($subFile && $subFile->getData('fileStage') === SubmissionFile::SUBMISSION_FILE_REVIEW_ATTACHMENT) {
+                    return null;
+                }
+            }
+        }
+
+        // If fileId is missing, attempt to resolve via submission_files
+        if (!$fileId && $submissionFileId) {
+            $subFile = Repo::submissionFile()->get($submissionFileId);
+            if ($subFile) {
+                $fileId = (int)$subFile->getData('fileId');
+                if (!$filename) {
+                    $filename = $subFile->getLocalizedData('name');
+                }
+                if (!$fileStage) {
+                    $fileStage = (int)$subFile->getData('fileStage');
+                }
+            } else {
+                $subFileRow = DB::table('submission_files')
+                    ->where('submission_file_id', $submissionFileId)
+                    ->first();
+                if ($subFileRow) {
+                    $fileId = (int)$subFileRow->file_id;
+                    if (!$fileStage) {
+                        $fileStage = (int)$subFileRow->file_stage;
+                    }
+                }
+            }
+        }
+
+        if (!$fileId) {
+            return null;
+        }
+
+        // Verify the file record exists in the files table
+        $fileRecord = DB::table('files')
+            ->where('file_id', $fileId)
+            ->first();
+        if (!$fileRecord) {
+            return null;
+        }
+
+        if (!$filename) {
+            $filename = basename($fileRecord->path);
+        }
+
+        return [
+            'fileId' => $fileId,
+            'submissionFileId' => $submissionFileId,
+            'filename' => $filename,
+            'fileStage' => $fileStage,
+            'fileStageLabel' => $fileStage ? self::formatFileStage($fileStage) : '',
+            'filePath' => $fileRecord->path,
+        ];
+    }
 }
+

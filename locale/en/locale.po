@@ -300,4 +300,32 @@ msgstr "Request URL"
 msgid "plugins.generic.detailedLog.card.requestBody"
 msgstr "Request Body / Payload"
 
+msgid "plugins.generic.detailedLog.downloadFile"
+msgstr "Download File"
+
+msgid "plugins.generic.detailedLog.fileReady"
+msgstr "Ready for download"
+
+msgid "plugins.generic.detailedLog.filePhysicalMissing"
+msgstr "Physical file missing from storage"
+
+msgid "plugins.generic.detailedLog.filePhysicalMissingTip"
+msgstr "The file record exists in the database, but the physical file is not found on disk."
+
+msgid "plugins.generic.detailedLog.fileNotFound"
+msgstr "File identifier not specified or invalid."
+
+msgid "plugins.generic.detailedLog.fileNotFoundDb"
+msgstr "The requested file record was not found in the database."
+
+msgid "plugins.generic.detailedLog.fileNotFoundDisk"
+msgstr "The requested file was found in the database records, but the physical file is missing from the server files directory."
+
+msgid "plugins.generic.detailedLog.fileAccessDenied"
+msgstr "Access denied: File does not belong to this submission."
+
+msgid "plugins.generic.detailedLog.fileAccessDeniedAnonymized"
+msgstr "Access to this file is restricted to preserve reviewer anonymity."
+
+
 

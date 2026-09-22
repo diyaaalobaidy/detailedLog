@@ -22,8 +22,10 @@ use APP\submission\Submission;
 use PKP\controllers\api\file\linkAction\DownloadFileLinkAction;
 use PKP\controllers\grid\eventLog\EventLogGridRow;
 use PKP\controllers\grid\eventLog\linkAction\EmailLinkAction;
+use PKP\controllers\grid\GridHandler;
 use PKP\linkAction\LinkAction;
 use PKP\linkAction\request\AjaxModal;
+use PKP\linkAction\request\RedirectAction;
 use PKP\log\EmailLogEntry;
 use PKP\log\event\EventLogEntry;
 use PKP\log\event\SubmissionFileEventLogEntry;
@@ -77,5 +79,37 @@ class DetailedEventLogGridRow extends EventLogGridRow
                 'information'
             )
         );
+
+        // Add Download File link action for file operations
+        $fileInfo = DetailedLogHelper::getFileInfoForLogEntry($logEntry, (bool) ($this->_isCurrentUserAssignedAuthor ?? false));
+        if ($fileInfo && !empty($fileInfo['fileId'])) {
+            $downloadArgs = [
+                'submissionId' => $submissionId,
+                'logId' => $logEntry->getId(),
+                'fileId' => $fileInfo['fileId'],
+            ];
+            if (!empty($fileInfo['submissionFileId'])) {
+                $downloadArgs['submissionFileId'] = $fileInfo['submissionFileId'];
+            }
+
+            $downloadUrl = $router->url($request, null, null, 'downloadFile', null, $downloadArgs);
+
+            $downloadLabel = DetailedLogHelper::translate('common.download', [], 'Download');
+            if (!empty($fileInfo['filename'])) {
+                $downloadLabel .= ' (' . $fileInfo['filename'] . ')';
+            }
+
+            $this->addAction(
+                new LinkAction(
+                    'downloadFile',
+                    new RedirectAction($downloadUrl),
+                    $downloadLabel,
+                    'download'
+                )
+            );
+        } else {
+            // Remove any download action if file access is disallowed or invalid
+            unset($this->_actions[GridHandler::GRID_ACTION_POSITION_DEFAULT]['downloadFile']);
+        }
     }
 }
