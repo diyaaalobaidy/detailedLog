@@ -69,6 +69,12 @@ class DetailedActivityRecorder
     /** Deduplication registry to prevent duplicate entries between domain hooks and DB queries */
     private static array $handledEvents = [];
 
+    /** Pending raw queries queued for deferred asynchronous logging */
+    private static array $pendingRawQueries = [];
+
+    /** Pending domain events queued for deferred asynchronous logging */
+    private static array $pendingEvents = [];
+
     /** Tables directly or indirectly belonging to a submission */
     private static array $monitoredTables = [
         'submissions' => true,
@@ -109,6 +115,10 @@ class DetailedActivityRecorder
         self::$isInitialized = true;
 
         try {
+            // Register shutdown function to flush all pending logs safely at request end
+            // without interfering with PDO's lastInsertId during active queries.
+            register_shutdown_function(self::flushPendingEvents(...));
+
             // 1. Low-level Laravel DB Query listener
             DB::listen(self::handleQuery(...));
 
@@ -185,7 +195,8 @@ class DetailedActivityRecorder
     }
 
     /**
-     * Write an event and its detailed settings into event_log and event_log_settings
+     * Queue an event and its detailed settings in memory for deferred writing.
+     * Prevents executing database queries during active application workflows.
      */
     public static function logEvent(
         int $submissionId,
@@ -195,52 +206,21 @@ class DetailedActivityRecorder
         ?int $userId = null,
         ?int $assocType = null,
         ?int $assocId = null
-    ): ?int {
-        if (self::$isLogging || !$submissionId) {
-            return null;
+    ): void {
+        if (!$submissionId) {
+            return;
         }
 
-        self::$isLogging = true;
         try {
             if ($userId === null) {
                 try {
                     $user = Application::get()->getRequest()?->getUser();
                     $userId = $user?->getId() ?: null;
-                } catch (\Throwable $e) {
+                } catch (\Throwable) {
                     $userId = null;
                 }
             }
 
-            $now = date('Y-m-d H:i:s');
-            $targetAssocType = $assocType ?: PKPApplication::ASSOC_TYPE_SUBMISSION;
-            $targetAssocId = $assocId ?: $submissionId;
-
-            $logId = DB::table('event_log')->insertGetId([
-                'assoc_type' => $targetAssocType,
-                'assoc_id' => $targetAssocId,
-                'user_id' => $userId,
-                'date_logged' => $now,
-                'event_type' => $eventType,
-                'message' => $message,
-                'is_translated' => 1,
-            ]);
-
-            // Ensure submissionId is always present in settings for fast querying
-            $settings['submissionId'] = (string)$submissionId;
-
-            // Enrich user details
-            if ($userId) {
-                try {
-                    $u = Repo::user()->get((int)$userId);
-                    if ($u) {
-                        $settings['username'] = $u->getUsername();
-                        $settings['userFullName'] = $u->getFullName();
-                    }
-                } catch (\Throwable $e) {
-                }
-            }
-
-            // Real client IP resolution (not reverse proxy IP)
             $realIp = self::getRealClientIp();
             if ($realIp) {
                 $settings['realIp'] = $realIp;
@@ -249,13 +229,11 @@ class DetailedActivityRecorder
                 }
             }
 
-            // Request body payload (JSON / POST / files)
             $requestBody = self::getRequestBody();
             if (!empty($requestBody) && !isset($settings['requestBody'])) {
                 $settings['requestBody'] = $requestBody;
             }
 
-            // HTTP method and request URL
             if (!empty($_SERVER['REQUEST_METHOD']) && !isset($settings['requestMethod'])) {
                 $settings['requestMethod'] = $_SERVER['REQUEST_METHOD'];
             }
@@ -263,44 +241,27 @@ class DetailedActivityRecorder
                 $settings['requestUrl'] = $_SERVER['REQUEST_URI'];
             }
 
-            // Insert settings in batch
-            $settingsRows = [];
-            foreach ($settings as $key => $val) {
-                if ($val === null) {
-                    continue;
-                }
-                if (is_bool($val)) {
-                    $val = $val ? '1' : '0';
-                } elseif (is_array($val) || is_object($val)) {
-                    $val = json_encode($val, JSON_UNESCAPED_UNICODE);
-                } else {
-                    $val = (string)$val;
-                }
+            $settings['submissionId'] = (string)$submissionId;
 
-                $settingName = substr((string)$key, 0, 255);
-                $settingsRows[] = [
-                    'log_id' => $logId,
-                    'locale' => '',
-                    'setting_name' => $settingName,
-                    'setting_value' => $val,
-                ];
-            }
-
-            if (!empty($settingsRows)) {
-                DB::table('event_log_settings')->insert($settingsRows);
-            }
-
-            return $logId;
+            self::$pendingEvents[] = [
+                'submissionId' => $submissionId,
+                'message' => $message,
+                'eventType' => $eventType,
+                'settings' => $settings,
+                'userId' => $userId,
+                'assocType' => $assocType ?: PKPApplication::ASSOC_TYPE_SUBMISSION,
+                'assocId' => $assocId ?: $submissionId,
+                'dateLogged' => date('Y-m-d H:i:s'),
+            ];
         } catch (\Throwable $e) {
-            DetailedLogHelper::logError('Failed to insert event log', $e);
-            return null;
-        } finally {
-            self::$isLogging = false;
+            DetailedLogHelper::logError('Failed to queue event log', $e);
         }
     }
 
     /**
-     * Intercept and process raw queries executed on database
+     * Intercept and process raw queries executed on database.
+     * Captured completely in-memory to prevent executing queries inside DB::listen,
+     * which would reset or corrupt PDO::lastInsertId() and crash entity inserts.
      */
     public static function handleQuery(mixed $query): void
     {
@@ -327,7 +288,7 @@ class DetailedActivityRecorder
                 return;
             }
 
-            // Parse query data and where parameters
+            // Parse query data and where parameters in-memory
             $data = [];
             $whereData = [];
             $bindings = $query->bindings ?? [];
@@ -381,46 +342,210 @@ class DetailedActivityRecorder
                 return;
             }
 
-            // Resolve submission ID
-            $submissionId = self::resolveSubmissionId($table, $operation, $data, $whereData);
-            if (!$submissionId) {
-                return;
+            // Capture current user ID safely from request without DB queries
+            $currentUserId = null;
+            try {
+                $currentUserId = Application::get()->getRequest()?->getUser()?->getId();
+            } catch (\Throwable) {
             }
 
-            // Format human-friendly table and message
-            $humanTable = self::formatTableName($table);
-            $message = "Database Activity: {$operation} on {$humanTable}";
-
-            $eventType = match ($operation) {
-                'INSERT', 'REPLACE' => self::EVENT_TYPE_DB_INSERT,
-                'UPDATE' => self::EVENT_TYPE_DB_UPDATE,
-                'DELETE' => self::EVENT_TYPE_DB_DELETE,
-                default => self::EVENT_TYPE_DB_UPDATE,
-            };
-
-            $settings = [
-                'tableName' => $table,
+            self::$pendingRawQueries[] = [
+                'table' => $table,
                 'operation' => $operation,
-                'submissionId' => $submissionId,
+                'data' => $data,
+                'whereData' => $whereData,
+                'recordId' => $recordId,
+                'timestamp' => date('Y-m-d H:i:s'),
+                'realIp' => self::getRealClientIp(),
+                'requestBody' => self::getRequestBody(),
+                'requestMethod' => $_SERVER['REQUEST_METHOD'] ?? null,
+                'requestUrl' => $_SERVER['REQUEST_URI'] ?? null,
+                'userId' => $currentUserId,
             ];
-            if ($recordId) {
-                $settings['recordId'] = (string)$recordId;
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('handleQuery in-memory parsing error', $e);
+        }
+    }
+
+    /**
+     * Flush all pending queued database and domain events safely to the database.
+     * Called on script shutdown and prior to rendering or exporting the event log grid.
+     */
+    public static function flushPendingEvents(): void
+    {
+        if (self::$isLogging || (empty(self::$pendingRawQueries) && empty(self::$pendingEvents))) {
+            return;
+        }
+
+        self::$isLogging = true;
+        try {
+            // 1. Process pending raw queries
+            $rawQueries = self::$pendingRawQueries;
+            self::$pendingRawQueries = [];
+
+            foreach ($rawQueries as $raw) {
+                try {
+                    $table = $raw['table'];
+                    $operation = $raw['operation'];
+                    $data = $raw['data'];
+                    $whereData = $raw['whereData'];
+                    $recordId = $raw['recordId'];
+
+                    if ($recordId && self::isHandled($table, $recordId, $operation)) {
+                        continue;
+                    }
+
+                    $submissionId = self::resolveSubmissionId($table, $operation, $data, $whereData);
+                    if (!$submissionId) {
+                        continue;
+                    }
+
+                    $humanTable = self::formatTableName($table);
+                    $message = "Database Activity: {$operation} on {$humanTable}";
+
+                    $eventType = match ($operation) {
+                        'INSERT', 'REPLACE' => self::EVENT_TYPE_DB_INSERT,
+                        'UPDATE' => self::EVENT_TYPE_DB_UPDATE,
+                        'DELETE' => self::EVENT_TYPE_DB_DELETE,
+                        default => self::EVENT_TYPE_DB_UPDATE,
+                    };
+
+                    $settings = [
+                        'tableName' => $table,
+                        'operation' => $operation,
+                        'submissionId' => (string)$submissionId,
+                    ];
+                    if ($recordId) {
+                        $settings['recordId'] = (string)$recordId;
+                    }
+                    if (!empty($raw['realIp'])) {
+                        $settings['realIp'] = $raw['realIp'];
+                        $settings['ipAddress'] = $raw['realIp'];
+                    }
+                    if (!empty($raw['requestBody'])) {
+                        $settings['requestBody'] = $raw['requestBody'];
+                    }
+                    if (!empty($raw['requestMethod'])) {
+                        $settings['requestMethod'] = $raw['requestMethod'];
+                    }
+                    if (!empty($raw['requestUrl'])) {
+                        $settings['requestUrl'] = $raw['requestUrl'];
+                    }
+
+                    foreach ($data as $k => $v) {
+                        if (in_array(strtolower($k), ['password', 'secret', 'token', 'key'])) {
+                            continue;
+                        }
+                        $settings["field:{$k}"] = is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE);
+                    }
+
+                    foreach ($whereData as $k => $v) {
+                        $settings["where:{$k}"] = is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE);
+                    }
+
+                    self::writeLogEntry(
+                        $submissionId,
+                        $message,
+                        $eventType,
+                        $settings,
+                        $raw['userId'],
+                        PKPApplication::ASSOC_TYPE_SUBMISSION,
+                        $submissionId,
+                        $raw['timestamp']
+                    );
+                } catch (\Throwable $qEx) {
+                    DetailedLogHelper::logError('Error processing pending raw query in flush', $qEx);
+                }
             }
 
-            foreach ($data as $k => $v) {
-                if (in_array(strtolower($k), ['password', 'secret', 'token', 'key'])) {
+            // 2. Process pending domain events
+            $events = self::$pendingEvents;
+            self::$pendingEvents = [];
+
+            foreach ($events as $event) {
+                try {
+                    self::writeLogEntry(
+                        $event['submissionId'],
+                        $event['message'],
+                        $event['eventType'],
+                        $event['settings'],
+                        $event['userId'],
+                        $event['assocType'],
+                        $event['assocId'],
+                        $event['dateLogged']
+                    );
+                } catch (\Throwable $eEx) {
+                    DetailedLogHelper::logError('Error processing pending domain event in flush', $eEx);
+                }
+            }
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Failed to flush pending event logs', $e);
+        } finally {
+            self::$isLogging = false;
+        }
+    }
+
+    /**
+     * Persist a single log record and its settings rows to the database
+     */
+    private static function writeLogEntry(
+        int $submissionId,
+        string $message,
+        int $eventType,
+        array $settings,
+        ?int $userId,
+        int $assocType,
+        int $assocId,
+        string $dateLogged
+    ): void {
+        try {
+            if ($userId && !isset($settings['username'])) {
+                try {
+                    $u = Repo::user()->get((int)$userId);
+                    if ($u) {
+                        $settings['username'] = $u->getUsername();
+                        $settings['userFullName'] = $u->getFullName();
+                    }
+                } catch (\Throwable) {
+                }
+            }
+
+            $logId = DB::table('event_log')->insertGetId([
+                'assoc_type' => $assocType,
+                'assoc_id' => $assocId,
+                'user_id' => $userId,
+                'date_logged' => $dateLogged,
+                'event_type' => $eventType,
+                'message' => $message,
+                'is_translated' => 1,
+            ]);
+
+            $settingsRows = [];
+            foreach ($settings as $key => $val) {
+                if ($val === null) {
                     continue;
                 }
-                $settings["field:{$k}"] = is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE);
+                if (is_bool($val)) {
+                    $val = $val ? '1' : '0';
+                } elseif (is_array($val) || is_object($val)) {
+                    $val = json_encode($val, JSON_UNESCAPED_UNICODE);
+                } else {
+                    $val = (string)$val;
+                }
+
+                $settingsRows[] = [
+                    'log_id' => $logId,
+                    'locale' => '',
+                    'setting_name' => substr((string)$key, 0, 255),
+                    'setting_value' => $val,
+                ];
             }
 
-            foreach ($whereData as $k => $v) {
-                $settings["where:{$k}"] = is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE);
+            if (!empty($settingsRows)) {
+                DB::table('event_log_settings')->insert($settingsRows);
             }
-
-            self::logEvent($submissionId, $message, $eventType, $settings);
         } catch (\Throwable $e) {
-            DetailedLogHelper::logError('handleQuery error', $e);
+            DetailedLogHelper::logError('Error writing log entry to database', $e);
         }
     }
 

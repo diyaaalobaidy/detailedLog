@@ -248,6 +248,7 @@ class DetailedLogPlugin extends GenericPlugin
                 $distinctSettingNames = 0;
 
                 try {
+                    classes\DetailedActivityRecorder::flushPendingEvents();
                     $totalEvents = DB::table('event_log')->count();
                     $totalSettings = DB::table('event_log_settings')->count();
                     $distinctSettingNames = DB::table('event_log_settings')->distinct('setting_name')->count('setting_name');

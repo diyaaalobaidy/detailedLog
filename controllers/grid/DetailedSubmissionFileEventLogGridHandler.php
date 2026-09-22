@@ -17,6 +17,7 @@ namespace APP\plugins\generic\detailedLog\controllers\grid;
 
 use APP\core\Application;
 use APP\facades\Repo;
+use APP\plugins\generic\detailedLog\classes\DetailedActivityRecorder;
 use APP\plugins\generic\detailedLog\classes\DetailedLogHelper;
 use APP\plugins\generic\detailedLog\DetailedLogPlugin;
 use PKP\core\PKPApplication;
@@ -88,6 +89,8 @@ class DetailedSubmissionFileEventLogGridHandler extends DetailedSubmissionEventL
     protected function loadData($request, $filter = null)
     {
         try {
+            DetailedActivityRecorder::flushPendingEvents();
+
             $submissionFile = $this->getSubmissionFile();
             if (!$submissionFile) {
                 return [];
