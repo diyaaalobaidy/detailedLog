@@ -357,14 +357,15 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
 
         foreach ($entries as $entry) {
             if ($entry instanceof EmailLogEntry) {
+                $senderInfo = DetailedLogHelper::getEmailSenderInfo($entry);
                 fputcsv($out, [
                     $entry->id,
                     $entry->dateSent,
                     'Email / Notification',
                     $entry->subject,
                     'Notification',
-                    $entry->senderFullName,
-                    '',
+                    $senderInfo['name'],
+                    $senderInfo['email'],
                     'Sender',
                     '', '', '', '',
                     '', '', '', '',
@@ -439,12 +440,14 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
 
         foreach ($entries as $entry) {
             if ($entry instanceof EmailLogEntry) {
+                $senderInfo = DetailedLogHelper::getEmailSenderInfo($entry);
                 $exportData['events'][] = [
                     'type' => 'email',
                     'id' => $entry->id,
                     'date' => $entry->dateSent,
                     'subject' => $entry->subject,
-                    'sender' => $entry->senderFullName,
+                    'sender' => $senderInfo['name'],
+                    'senderEmail' => $senderInfo['email'],
                     'recipients' => $entry->recipients,
                 ];
                 continue;

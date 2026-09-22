@@ -85,10 +85,9 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
     protected function renderUserCell(EventLogEntry|EmailLogEntry $element): string
     {
         if ($element instanceof EmailLogEntry) {
-            $name = htmlspecialchars($element->senderFullName ?: DetailedLogHelper::translate('plugins.generic.detailedLog.systemUser', [], 'System / Automated'));
-            $email = htmlspecialchars($element->senderEmail ?: '');
-            return '<div class="detailed-log-user-cell"><strong class="user-fullname">' . $name . '</strong>' .
-                ($email ? '<br><small class="text-muted">' . $email . '</small>' : '') . '</div>';
+            $senderInfo = DetailedLogHelper::getEmailSenderInfo($element);
+            return '<div class="detailed-log-user-cell"><strong class="user-fullname">' . htmlspecialchars($senderInfo['name']) . '</strong>' .
+                ($senderInfo['email'] ? '<br><small class="text-muted">' . htmlspecialchars($senderInfo['email']) . '</small>' : '') . '</div>';
         }
 
         $userName = $element->getUserFullName();
@@ -172,7 +171,7 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
         $cat = DetailedLogHelper::getEventCategory($element);
 
         if ($element instanceof EmailLogEntry) {
-            $subject = htmlspecialchars($element->prefixedSubject ?: $element->subject);
+            $subject = htmlspecialchars($element->subject ?: '');
             return '<div class="detailed-log-event-cell">' .
                 '<span class="badge badge-cat ' . $cat['badgeClass'] . '">' . $cat['icon'] . ' ' . htmlspecialchars($cat['name']) . '</span> ' .
                 '<span class="event-title">' . $subject . '</span></div>';

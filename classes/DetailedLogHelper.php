@@ -439,9 +439,10 @@ class DetailedLogHelper
         ];
 
         if ($entry instanceof EmailLogEntry) {
+            $senderInfo = self::getEmailSenderInfo($entry);
             $highlights['communication'] = [
                 'subject' => $entry->subject,
-                'sender' => $entry->senderFullName ?: $entry->senderEmail,
+                'sender' => $senderInfo['name'] . ($senderInfo['email'] ? " <{$senderInfo['email']}>" : ''),
                 'recipients' => is_array($entry->recipients) ? implode(', ', $entry->recipients) : (string)$entry->recipients,
             ];
             return $highlights;
@@ -574,5 +575,39 @@ class DetailedLogHelper
         }
 
         return null;
+    }
+
+    /**
+     * Safely get the sender full name and email for an EmailLogEntry without triggering
+     * core PKP's bug where senderId is null.
+     */
+    public static function getEmailSenderInfo(EmailLogEntry $entry): array
+    {
+        $name = '';
+        $email = '';
+
+        if (!empty($entry->senderId)) {
+            try {
+                $sender = Repo::user()->get((int)$entry->senderId, true);
+                if ($sender) {
+                    $name = $sender->getFullName();
+                    $email = $sender->getEmail();
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        if (empty($name)) {
+            $name = $entry->from ?: self::translate('plugins.generic.detailedLog.systemUser', [], 'System / Automated');
+        }
+
+        if (empty($email) && !empty($entry->fromAddress)) {
+            $email = $entry->fromAddress;
+        }
+
+        return [
+            'name' => $name,
+            'email' => $email,
+        ];
     }
 }
