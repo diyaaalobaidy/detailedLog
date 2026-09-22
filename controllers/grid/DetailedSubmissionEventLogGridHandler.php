@@ -289,6 +289,18 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
         $templateMgr = TemplateManager::getManager($request);
         $plugin = $this->getPlugin();
 
+        $realIp = null;
+        $requestBody = null;
+        foreach ($rawSettings as $setting) {
+            if ($setting['name'] === 'realIp') {
+                $realIp = $setting['value'];
+            } elseif ($setting['name'] === 'ipAddress' && !$realIp) {
+                $realIp = $setting['value'];
+            } elseif ($setting['name'] === 'requestBody') {
+                $requestBody = $setting['value'];
+            }
+        }
+
         $templateMgr->assign([
             'logEntry' => $entry,
             'logId' => $logId,
@@ -297,6 +309,8 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             'eventCategory' => $category,
             'translatedMessage' => $entry->getTranslatedMessage(null, $this->_isCurrentUserAssignedAuthor),
             'userDetails' => $userDetails,
+            'realIp' => $realIp,
+            'requestBody' => $requestBody,
             'rawSettings' => $rawSettings,
             'interpretedSettings' => $interpretedSettings,
             'highlights' => $highlights,

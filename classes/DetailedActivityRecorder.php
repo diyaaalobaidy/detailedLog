@@ -231,9 +231,27 @@ class DetailedActivityRecorder
                 }
             }
 
-            // Client IP
-            if (!isset($settings['ipAddress']) && !empty($_SERVER['REMOTE_ADDR'])) {
-                $settings['ipAddress'] = $_SERVER['REMOTE_ADDR'];
+            // Real client IP resolution (not reverse proxy IP)
+            $realIp = self::getRealClientIp();
+            if ($realIp) {
+                $settings['realIp'] = $realIp;
+                if (!isset($settings['ipAddress'])) {
+                    $settings['ipAddress'] = $realIp;
+                }
+            }
+
+            // Request body payload (JSON / POST / files)
+            $requestBody = self::getRequestBody();
+            if (!empty($requestBody) && !isset($settings['requestBody'])) {
+                $settings['requestBody'] = $requestBody;
+            }
+
+            // HTTP method and request URL
+            if (!empty($_SERVER['REQUEST_METHOD']) && !isset($settings['requestMethod'])) {
+                $settings['requestMethod'] = $_SERVER['REQUEST_METHOD'];
+            }
+            if (!empty($_SERVER['REQUEST_URI']) && !isset($settings['requestUrl'])) {
+                $settings['requestUrl'] = $_SERVER['REQUEST_URI'];
             }
 
             // Insert settings in batch
@@ -1378,5 +1396,183 @@ class DetailedActivityRecorder
             'submission_comments' => 'Submission Comments',
             default => $table,
         };
+    }
+
+    /**
+     * Resolve real client IP address bypassing reverse proxies, CDNs, and load balancers
+     */
+    public static function getRealClientIp(): string
+    {
+        $headers = [
+            'HTTP_CF_CONNECTING_IP',     // Cloudflare
+            'HTTP_X_REAL_IP',             // Nginx proxy_set_header X-Real-IP
+            'HTTP_X_FORWARDED_FOR',       // Standard proxies / load balancers
+            'HTTP_CLIENT_IP',             // Shared Internet / Proxy
+            'HTTP_X_CLUSTER_CLIENT_IP',   // Cluster proxy
+        ];
+
+        foreach ($headers as $header) {
+            if (!empty($_SERVER[$header])) {
+                $value = $_SERVER[$header];
+                if (str_contains($value, ',')) {
+                    $ips = explode(',', $value);
+                    // Prioritize public non-private/non-reserved IPs
+                    foreach ($ips as $ip) {
+                        $ip = trim($ip);
+                        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                            return $ip;
+                        }
+                    }
+                    // Fallback to first valid IP
+                    foreach ($ips as $ip) {
+                        $ip = trim($ip);
+                        if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                            return $ip;
+                        }
+                    }
+                } else {
+                    $ip = trim($value);
+                    if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                        return $ip;
+                    }
+                }
+            }
+        }
+
+        // Fallback to OJS request if available
+        try {
+            $ojsIp = Application::get()->getRequest()?->getRemoteAddr();
+            if ($ojsIp && filter_var($ojsIp, FILTER_VALIDATE_IP)) {
+                return $ojsIp;
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // Final fallback
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+        if (filter_var($remoteAddr, FILTER_VALIDATE_IP)) {
+            return $remoteAddr;
+        }
+
+        return $remoteAddr ?: '127.0.0.1';
+    }
+
+    /**
+     * Safely capture and format the request body payload (JSON / POST / files)
+     */
+    public static function getRequestBody(): ?string
+    {
+        static $cachedBody = null;
+        if ($cachedBody !== null) {
+            return $cachedBody;
+        }
+
+        if (PHP_SAPI === 'cli' && empty($_POST) && !isset($_SERVER['REQUEST_METHOD'])) {
+            $cachedBody = '';
+            return null;
+        }
+
+        $raw = '';
+        try {
+            $raw = file_get_contents('php://input');
+        } catch (\Throwable $e) {
+            $raw = '';
+        }
+
+        $data = null;
+        if (!empty($raw)) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $data = $decoded;
+            } else {
+                parse_str($raw, $parsed);
+                if (!empty($parsed) && count($parsed) > 1) {
+                    $data = $parsed;
+                }
+            }
+        }
+
+        // Fallback to $_POST for form-encoded / multipart posts
+        if (empty($data) && !empty($_POST)) {
+            $data = $_POST;
+        }
+
+        // Append file metadata if files were uploaded in this request
+        if (!empty($_FILES)) {
+            $fileSummaries = [];
+            foreach ($_FILES as $field => $file) {
+                if (is_array($file['name'] ?? null)) {
+                    $names = implode(', ', $file['name']);
+                    $fileSummaries[] = "{$field}: [{$names}]";
+                } else {
+                    $name = $file['name'] ?? 'unknown';
+                    $size = $file['size'] ?? 0;
+                    $fileSummaries[] = "{$field}: {$name} ({$size} bytes)";
+                }
+            }
+            if ($data !== null) {
+                $data['_uploaded_files'] = $fileSummaries;
+            } else {
+                $data = ['_uploaded_files' => $fileSummaries];
+            }
+        }
+
+        if (!empty($data)) {
+            $data = self::sanitizePayload($data);
+            $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (mb_strlen($encoded) > 32768) {
+                $encoded = mb_substr($encoded, 0, 32700) . "\n... [truncated]";
+            }
+            $cachedBody = $encoded;
+            return $cachedBody;
+        }
+
+        if (!empty($raw)) {
+            if (mb_strlen($raw) > 32768) {
+                $raw = mb_substr($raw, 0, 32700) . "\n... [truncated]";
+            }
+            $cachedBody = $raw;
+            return $cachedBody;
+        }
+
+        $cachedBody = '';
+        return null;
+    }
+
+    /**
+     * Redact sensitive attributes (passwords, tokens, keys) from payload
+     */
+    public static function sanitizePayload(mixed $data): mixed
+    {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        $sensitiveKeys = [
+            'password', 'oldpassword', 'newpassword', 'confirmpassword',
+            'secret', 'token', 'csrf', 'csrftoken', 'apikey', 'auth'
+        ];
+
+        $sanitized = [];
+        foreach ($data as $k => $v) {
+            $lowerK = strtolower((string)$k);
+            $isSensitive = false;
+            foreach ($sensitiveKeys as $pattern) {
+                if (str_contains($lowerK, $pattern)) {
+                    $isSensitive = true;
+                    break;
+                }
+            }
+
+            if ($isSensitive) {
+                $sanitized[$k] = '***REDACTED***';
+            } elseif (is_array($v)) {
+                $sanitized[$k] = self::sanitizePayload($v);
+            } else {
+                $sanitized[$k] = $v;
+            }
+        }
+
+        return $sanitized;
     }
 }

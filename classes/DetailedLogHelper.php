@@ -335,7 +335,11 @@ class DetailedLogHelper
             'tableName' => 'Database Table',
             'operation' => 'Database Operation',
             'recordId' => 'Record ID',
+            'realIp' => 'Real IP Address',
             'ipAddress' => 'Client IP Address',
+            'requestBody' => 'Request Body (Payload)',
+            'requestMethod' => 'HTTP Method',
+            'requestUrl' => 'Request URL',
             'authorName' => 'Contributor Name',
             'authorId' => 'Contributor ID',
             'assignedUserName' => 'Assigned User',
@@ -370,7 +374,12 @@ class DetailedLogHelper
                 case 'tableName':
                 case 'operation':
                 case 'recordId':
+                case 'requestMethod':
+                case 'requestUrl':
                     $category = 'database';
+                    break;
+                case 'requestBody':
+                    $category = 'communication';
                     break;
                 case 'fileStage':
                     $interpreted = self::formatFileStage((int)$value) . " (Code {$value})";
@@ -404,6 +413,7 @@ class DetailedLogHelper
                 case 'userGroupName':
                 case 'username':
                 case 'userId':
+                case 'realIp':
                 case 'ipAddress':
                     $category = 'user';
                     break;
@@ -634,6 +644,16 @@ class DetailedLogHelper
                 'recipient' => $data['recipientName'] ?? '',
                 'recipientCount' => $data['recipientCount'] ?? null,
             ];
+        }
+
+        // Check for real IP
+        if (!empty($data['realIp'])) {
+            $highlights['realIp'] = $data['realIp'];
+        }
+
+        // Check for request body
+        if (!empty($data['requestBody'])) {
+            $highlights['requestBody'] = $data['requestBody'];
         }
 
         return $highlights;

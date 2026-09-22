@@ -163,6 +163,23 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
             $userStr .= ' [' . $userGroup . ']';
         }
 
+        // Append real client IP if available
+        $realIp = $element->getData('realIp') ?: null;
+        if (!$realIp) {
+            $rawSettings = DetailedLogHelper::getRawSettings($element->getId());
+            foreach ($rawSettings as $s) {
+                if ($s['name'] === 'realIp') {
+                    $realIp = $s['value'];
+                    break;
+                } elseif ($s['name'] === 'ipAddress' && !$realIp) {
+                    $realIp = $s['value'];
+                }
+            }
+        }
+        if (!empty($realIp)) {
+            $userStr .= ' (' . $realIp . ')';
+        }
+
         return $userStr;
     }
 

@@ -26,6 +26,10 @@
 						<em>{translate key="plugins.generic.detailedLog.systemUser"}</em>
 					{/if}
 				</span>
+				{if $realIp}
+					<span class="meta-separator">&bull;</span>
+					<span class="meta-item"><strong>{translate key="plugins.generic.detailedLog.setting.realIp"}:</strong> <span class="font-mono font-bold">{$realIp|escape}</span></span>
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -196,6 +200,18 @@
 							</div>
 						{/if}
 					</div>
+				</div>
+			</div>
+		{/if}
+		{* 6. Request Body Card *}
+		{if $requestBody}
+			<div class="highlight-card card-request-body" style="grid-column: 1 / -1;">
+				<div class="card-header">
+					<span class="card-icon">📥</span>
+					<h4>{translate key="plugins.generic.detailedLog.card.requestBody"}</h4>
+				</div>
+				<div class="card-body">
+					<pre style="max-height: 250px; overflow-y: auto; background: #f8fafc; padding: 12px; border-radius: 4px; font-size: 0.85em; font-family: monospace; white-space: pre-wrap; word-break: break-all; border: 1px solid #e2e8f0; margin: 0;"><code>{$requestBody|escape}</code></pre>
 				</div>
 			</div>
 		{/if}

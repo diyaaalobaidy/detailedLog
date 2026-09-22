@@ -285,3 +285,19 @@ msgstr "مرسل المناقشة"
 msgid "plugins.generic.detailedLog.setting.noteExcerpt"
 msgstr "مقتطف الرسالة"
 
+msgid "plugins.generic.detailedLog.setting.realIp"
+msgstr "عنوان IP الحقيقي للمستخدم"
+
+msgid "plugins.generic.detailedLog.setting.requestBody"
+msgstr "محتوى الطلب (Payload)"
+
+msgid "plugins.generic.detailedLog.setting.requestMethod"
+msgstr "طريقة طلب HTTP"
+
+msgid "plugins.generic.detailedLog.setting.requestUrl"
+msgstr "رابط الطلب (URL)"
+
+msgid "plugins.generic.detailedLog.card.requestBody"
+msgstr "محتوى الطلب والبيانات المرسلة"
+
+

@@ -285,3 +285,19 @@ msgstr "Posted By"
 msgid "plugins.generic.detailedLog.setting.noteExcerpt"
 msgstr "Message Preview"
 
+msgid "plugins.generic.detailedLog.setting.realIp"
+msgstr "Real IP Address"
+
+msgid "plugins.generic.detailedLog.setting.requestBody"
+msgstr "Request Body (Payload)"
+
+msgid "plugins.generic.detailedLog.setting.requestMethod"
+msgstr "HTTP Method"
+
+msgid "plugins.generic.detailedLog.setting.requestUrl"
+msgstr "Request URL"
+
+msgid "plugins.generic.detailedLog.card.requestBody"
+msgstr "Request Body / Payload"
+
+
