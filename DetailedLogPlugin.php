@@ -49,15 +49,40 @@ class DetailedLogPlugin extends GenericPlugin
     /**
      * @copydoc LazyLoadPlugin::getEnabled()
      *
-     * Enabled by default across all journals unless explicitly disabled.
+     * Mandatory and permanently enabled on all journals and site-wide.
      */
     public function getEnabled($contextId = null)
     {
-        $setting = parent::getEnabled($contextId);
-        if ($setting === false || $setting === '0' || $setting === 0) {
-            return false;
-        }
         return true;
+    }
+
+    /**
+     * @copydoc LazyLoadPlugin::getCanEnable()
+     *
+     * Cannot be toggled because it is permanently active.
+     */
+    public function getCanEnable()
+    {
+        return false;
+    }
+
+    /**
+     * @copydoc LazyLoadPlugin::getCanDisable()
+     *
+     * Mandatory plugin: cannot be disabled on any journal or site-wide.
+     */
+    public function getCanDisable()
+    {
+        return false;
+    }
+
+    /**
+     * @copydoc LazyLoadPlugin::setEnabled()
+     */
+    public function setEnabled($enabled)
+    {
+        // Enforce permanent active state
+        return parent::setEnabled(true);
     }
 
     /**
