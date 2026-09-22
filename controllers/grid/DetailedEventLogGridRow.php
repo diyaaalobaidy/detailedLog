@@ -33,6 +33,14 @@ use PKP\submissionFile\SubmissionFile;
 class DetailedEventLogGridRow extends EventLogGridRow
 {
     /**
+     * Get the submission associated with this row
+     */
+    public function getSubmission(): ?Submission
+    {
+        return $this->_submission;
+    }
+
+    /**
      * @copydoc GridRow::initialize()
      */
     public function initialize($request, $template = null)
@@ -40,71 +48,34 @@ class DetailedEventLogGridRow extends EventLogGridRow
         parent::initialize($request, $template);
 
         $logEntry = $this->getData();
-        assert($logEntry != null && ($logEntry instanceof EventLogEntry || $logEntry instanceof EmailLogEntry));
+        if (!$logEntry || !($logEntry instanceof EventLogEntry)) {
+            return;
+        }
 
         $router = $request->getRouter();
         $submission = $this->getSubmission();
-
-        if ($logEntry instanceof EventLogEntry) {
-            $actionArgs = [
-                'submissionId' => $submission->getId(),
-                'logId' => $logEntry->getId(),
-            ];
-
-            // 1. Add the "View Full Details" modal link action
-            $this->addAction(
-                new LinkAction(
-                    'viewLogDetails',
-                    new AjaxModal(
-                        $router->url($request, null, null, 'viewLogDetails', null, $actionArgs),
-                        DetailedLogHelper::translate('plugins.generic.detailedLog.viewDetailsTitle', ['id' => $logEntry->getId()], "Activity Log Details - #{$logEntry->getId()}"),
-                        'modal_information'
-                    ),
-                    DetailedLogHelper::translate('plugins.generic.detailedLog.viewDetails', [], 'View Details'),
-                    'information'
-                )
-            );
-
-            // 2. Download action for file uploads / revisions
-            switch ($logEntry->getEventType()) {
-                case SubmissionFileEventLogEntry::SUBMISSION_LOG_FILE_REVISION_UPLOAD:
-                case SubmissionFileEventLogEntry::SUBMISSION_LOG_FILE_UPLOAD:
-                    $submissionFileId = $logEntry->getData('submissionFileId');
-                    $fileId = $logEntry->getData('fileId');
-                    $submissionFile = $submissionFileId ? Repo::submissionFile()->get($submissionFileId) : null;
-                    if (!$submissionFile) {
-                        break;
-                    }
-                    $filename = $logEntry->getLocalizedData('filename') ?? $submissionFile->getLocalizedData('name');
-                    if ($submissionFile) {
-                        $anonymousAuthor = false;
-                        $maybeAnonymousAuthor = $this->_isCurrentUserAssignedAuthor && $submissionFile->getData('fileStage') === SubmissionFile::SUBMISSION_FILE_REVIEW_ATTACHMENT;
-                        if ($maybeAnonymousAuthor && $submissionFile->getData('assocType') === Application::ASSOC_TYPE_REVIEW_ASSIGNMENT) {
-                            $reviewAssignment = Repo::reviewAssignment()->get($submissionFile->getData('assocId'));
-                            if ($reviewAssignment && in_array($reviewAssignment->getReviewMethod(), [ReviewAssignment::SUBMISSION_REVIEW_METHOD_ANONYMOUS, ReviewAssignment::SUBMISSION_REVIEW_METHOD_DOUBLEANONYMOUS])) {
-                                $anonymousAuthor = true;
-                            }
-                        }
-                        if (!$anonymousAuthor) {
-                            $workflowStageId = Repo::submissionFile()->getWorkflowStageId($submissionFile);
-                            if ($workflowStageId || $submissionFile->getData('fileStage') != SubmissionFile::SUBMISSION_FILE_QUERY) {
-                                $this->addAction(new DownloadFileLinkAction($request, $submissionFile, $workflowStageId, __('common.download'), $fileId, $filename));
-                            }
-                        }
-                    }
-                    break;
-            }
-        } elseif ($logEntry instanceof EmailLogEntry) {
-            $this->addAction(
-                new EmailLinkAction(
-                    $request,
-                    __('submission.event.viewEmail'),
-                    [
-                        'submissionId' => $logEntry->assocId,
-                        'emailLogEntryId' => $logEntry->id,
-                    ]
-                )
-            );
+        $submissionId = $submission ? $submission->getId() : (int) ($request->getUserVar('submissionId') ?: $logEntry->getData('submissionId'));
+        if (!$submissionId && $logEntry->getAssocType() == Application::ASSOC_TYPE_SUBMISSION) {
+            $submissionId = (int) $logEntry->getAssocId();
         }
+
+        $actionArgs = [
+            'submissionId' => $submissionId,
+            'logId' => $logEntry->getId(),
+        ];
+
+        // Add the "View Full Details" modal link action
+        $this->addAction(
+            new LinkAction(
+                'viewLogDetails',
+                new AjaxModal(
+                    $router->url($request, null, null, 'viewLogDetails', null, $actionArgs),
+                    DetailedLogHelper::translate('plugins.generic.detailedLog.viewDetailsTitle', ['id' => $logEntry->getId()], "Activity Log Details - #{$logEntry->getId()}"),
+                    'modal_information'
+                ),
+                DetailedLogHelper::translate('plugins.generic.detailedLog.viewDetails', [], 'View Details'),
+                'information'
+            )
+        );
     }
 }
