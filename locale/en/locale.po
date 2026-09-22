@@ -300,4 +300,8 @@ msgstr "Request URL"
 msgid "plugins.generic.detailedLog.card.requestBody"
 msgstr "Request Body / Payload"
 
+msgid "plugins.generic.detailedLog.cannotBeDisabled"
+msgstr "This plugin is mandatory across all journals and cannot be disabled."
+
+
 
