@@ -28,9 +28,9 @@ use PKP\submissionFile\SubmissionFile;
 class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
 {
     /** @var bool Is the current user assigned as an author to this submission */
-    public bool $_isCurrentUserAssignedAuthor;
+    public bool $_isCurrentUserAssignedAuthor = false;
 
-    public function __construct(bool $isCurrentUserAssignedAuthor)
+    public function __construct(bool $isCurrentUserAssignedAuthor = false)
     {
         parent::__construct();
         $this->_isCurrentUserAssignedAuthor = $isCurrentUserAssignedAuthor;

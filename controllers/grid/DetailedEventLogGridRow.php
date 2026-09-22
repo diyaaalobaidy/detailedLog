@@ -17,6 +17,7 @@ namespace APP\plugins\generic\detailedLog\controllers\grid;
 
 use APP\core\Application;
 use APP\facades\Repo;
+use APP\plugins\generic\detailedLog\classes\DetailedLogHelper;
 use APP\submission\Submission;
 use PKP\controllers\api\file\linkAction\DownloadFileLinkAction;
 use PKP\controllers\grid\eventLog\EventLogGridRow;
@@ -56,10 +57,10 @@ class DetailedEventLogGridRow extends EventLogGridRow
                     'viewLogDetails',
                     new AjaxModal(
                         $router->url($request, null, null, 'viewLogDetails', null, $actionArgs),
-                        __('plugins.generic.detailedLog.viewDetailsTitle', ['id' => $logEntry->getId()], "Activity Log Details - #{$logEntry->getId()}"),
+                        DetailedLogHelper::translate('plugins.generic.detailedLog.viewDetailsTitle', ['id' => $logEntry->getId()], "Activity Log Details - #{$logEntry->getId()}"),
                         'modal_information'
                     ),
-                    __('plugins.generic.detailedLog.viewDetails', [], 'View Details'),
+                    DetailedLogHelper::translate('plugins.generic.detailedLog.viewDetails', [], 'View Details'),
                     'information'
                 )
             );

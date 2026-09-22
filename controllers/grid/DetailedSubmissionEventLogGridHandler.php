@@ -38,6 +38,9 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
     /** @var DetailedLogPlugin The plugin instance */
     public ?DetailedLogPlugin $_plugin = null;
 
+    /** @var bool Is current user author */
+    public $_isCurrentUserAssignedAuthor = false;
+
     /**
      * Constructor
      */
@@ -59,6 +62,12 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
     {
         if (!$this->_plugin) {
             $this->_plugin = PluginRegistry::getPlugin('generic', 'detailedlogplugin');
+            if (!$this->_plugin) {
+                $this->_plugin = PluginRegistry::loadPlugin('generic', 'detailedLog');
+            }
+            if (!$this->_plugin) {
+                $this->_plugin = new DetailedLogPlugin();
+            }
         }
         return $this->_plugin;
     }
@@ -78,9 +87,9 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
         $this->_stageId = (int) ($args['stageId'] ?? null);
 
         // Clear default 3 columns and register our enhanced 5 columns
-        $this->setColumns([]);
+        $this->_columns = [];
 
-        $cellProvider = new DetailedEventLogGridCellProvider($this->_isCurrentUserAssignedAuthor);
+        $cellProvider = new DetailedEventLogGridCellProvider((bool) ($this->_isCurrentUserAssignedAuthor ?? false));
 
         // Column 1: Date & Time
         $this->addColumn(
@@ -150,7 +159,7 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             new LinkAction(
                 'exportCsv',
                 new OpenWindowAction($router->url($request, null, null, 'exportCsv', null, $actionArgs)),
-                __('plugins.generic.detailedLog.exportCsv', [], 'Export CSV'),
+                DetailedLogHelper::translate('plugins.generic.detailedLog.exportCsv', [], 'Export CSV'),
                 'export'
             )
         );
@@ -159,7 +168,7 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
             new LinkAction(
                 'exportJson',
                 new OpenWindowAction($router->url($request, null, null, 'exportJson', null, $actionArgs)),
-                __('plugins.generic.detailedLog.exportJson', [], 'Export JSON'),
+                DetailedLogHelper::translate('plugins.generic.detailedLog.exportJson', [], 'Export JSON'),
                 'export'
             )
         );
@@ -170,7 +179,7 @@ class DetailedSubmissionEventLogGridHandler extends SubmissionEventLogGridHandle
      */
     protected function getRowInstance()
     {
-        return new DetailedEventLogGridRow($this->getSubmission(), $this->_isCurrentUserAssignedAuthor);
+        return new DetailedEventLogGridRow($this->getSubmission(), (bool) ($this->_isCurrentUserAssignedAuthor ?? false));
     }
 
     /**
