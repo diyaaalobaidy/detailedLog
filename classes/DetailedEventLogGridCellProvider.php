@@ -62,35 +62,37 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
     }
 
     /**
-     * Render the Date & Time cell
+     * Render the Date & Time cell as plain text
      */
     protected function renderDateCell(EventLogEntry|EmailLogEntry $element): string
     {
         $dateStr = $element instanceof EventLogEntry ? $element->getDateLogged() : $element->dateSent;
+        if (!$dateStr) {
+            return '';
+        }
         $timestamp = strtotime($dateStr);
-        $formattedDate = date('Y-m-d H:i:s', $timestamp);
-        $shortDate = date('M j, Y', $timestamp);
-        $time = date('H:i', $timestamp);
-
-        $html = '<div class="detailed-log-date-cell">';
-        $html .= '<span class="date-full" title="' . htmlspecialchars($formattedDate) . '">' . htmlspecialchars($shortDate) . ' <small class="text-muted">' . htmlspecialchars($time) . '</small></span>';
-        $html .= '</div>';
-
-        return $html;
+        return date('Y-m-d H:i:s', $timestamp);
     }
 
     /**
-     * Render the User cell with username and role badges
+     * Render the User cell as plain text with username and role
      */
     protected function renderUserCell(EventLogEntry|EmailLogEntry $element): string
     {
         if ($element instanceof EmailLogEntry) {
             $senderInfo = DetailedLogHelper::getEmailSenderInfo($element);
-            return '<div class="detailed-log-user-cell"><strong class="user-fullname">' . htmlspecialchars($senderInfo['name']) . '</strong>' .
-                ($senderInfo['email'] ? '<br><small class="text-muted">' . htmlspecialchars($senderInfo['email']) . '</small>' : '') . '</div>';
+            $userStr = $senderInfo['name'];
+            if (!empty($senderInfo['email']) && $senderInfo['email'] !== $senderInfo['name']) {
+                $userStr .= ' (' . $senderInfo['email'] . ')';
+            }
+            return $userStr;
         }
 
-        $userName = $element->getUserFullName();
+        $userName = null;
+        try {
+            $userName = $element->getUserFullName();
+        } catch (\Throwable $e) {
+        }
         $username = $element->getData('username');
         $userGroup = $element->getData('userGroupName');
         if (is_array($userGroup)) {
@@ -112,7 +114,10 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
                 if ($reviewAssignmentId = $element->getData('reviewAssignmentId')) {
                     $reviewAssignment = Repo::reviewAssignment()->get($reviewAssignmentId);
                     if ($reviewAssignment && $reviewAssignment->getReviewMethod() === ReviewAssignment::SUBMISSION_REVIEW_METHOD_OPEN) {
-                        $userName = $element->getUserFullName();
+                        try {
+                            $userName = $element->getUserFullName();
+                        } catch (\Throwable $e) {
+                        }
                         $username = $element->getData('username');
                     }
                 }
@@ -150,52 +155,46 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
             $userName = DetailedLogHelper::translate('plugins.generic.detailedLog.systemUser', [], 'System / Automated');
         }
 
-        $html = '<div class="detailed-log-user-cell">';
-        $html .= '<strong class="user-fullname">' . htmlspecialchars($userName) . '</strong>';
+        $userStr = $userName;
         if (!empty($username) && $username !== $userName) {
-            $html .= ' <span class="user-username text-muted">(@' . htmlspecialchars($username) . ')</span>';
+            $userStr .= ' (@' . $username . ')';
         }
         if (!empty($userGroup)) {
-            $html .= '<div class="user-role-badge"><span class="badge badge-role">' . htmlspecialchars($userGroup) . '</span></div>';
+            $userStr .= ' [' . $userGroup . ']';
         }
-        $html .= '</div>';
 
-        return $html;
+        return $userStr;
     }
 
     /**
-     * Render the Event / Action cell with category icon and badges
+     * Render the Event / Action cell as plain text
      */
     protected function renderEventCell(EventLogEntry|EmailLogEntry $element): string
     {
         $cat = DetailedLogHelper::getEventCategory($element);
 
         if ($element instanceof EmailLogEntry) {
-            $subject = htmlspecialchars($element->subject ?: '');
-            return '<div class="detailed-log-event-cell">' .
-                '<span class="badge badge-cat ' . $cat['badgeClass'] . '">' . $cat['icon'] . ' ' . htmlspecialchars($cat['name']) . '</span> ' .
-                '<span class="event-title">' . $subject . '</span></div>';
+            return '[' . $cat['name'] . '] ' . ($element->subject ?: 'Notification');
         }
 
-        $translated = $element->getTranslatedMessage(null, $this->_isCurrentUserAssignedAuthor);
+        $translated = '';
+        try {
+            $translated = $element->getTranslatedMessage(null, $this->_isCurrentUserAssignedAuthor);
+        } catch (\Throwable $e) {
+            $translated = (string) $element->getMessage();
+        }
         $logId = $element->getId();
 
-        $html = '<div class="detailed-log-event-cell">';
-        $html .= '<span class="badge badge-cat ' . $cat['badgeClass'] . '">' . $cat['icon'] . ' ' . htmlspecialchars($cat['name']) . '</span> ';
-        $html .= '<strong class="event-title">' . htmlspecialchars($translated) . '</strong>';
-        $html .= ' <small class="text-muted event-id">#' . (int)$logId . '</small>';
-        $html .= '</div>';
-
-        return $html;
+        return '[' . $cat['name'] . '] ' . $translated . ' (#' . $logId . ')';
     }
 
     /**
-     * Render the Workflow Stage cell
+     * Render the Workflow Stage cell as plain text
      */
     protected function renderStageCell(EventLogEntry|EmailLogEntry $element): string
     {
         if ($element instanceof EmailLogEntry) {
-            return '<span class="badge badge-stage stage-email">' . DetailedLogHelper::translate('plugins.generic.detailedLog.emailNotice', [], 'Notification') . '</span>';
+            return DetailedLogHelper::translate('plugins.generic.detailedLog.emailNotice', [], 'Notification');
         }
 
         $stageId = $element->getData('stageId');
@@ -216,42 +215,40 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
             $label = DetailedLogHelper::translate('plugins.generic.detailedLog.generalWorkflow', [], 'General');
         }
 
-        return '<span class="badge badge-stage stage-pill">' . htmlspecialchars($label) . '</span>';
+        return $label;
     }
 
     /**
-     * Render the Details cell showing all key parameters from event_log_settings
+     * Render the Details cell showing all key parameters from event_log_settings as plain text
      */
     protected function renderDetailsCell(EventLogEntry|EmailLogEntry $element): string
     {
         if ($element instanceof EmailLogEntry) {
             $recipients = is_array($element->recipients) ? implode(', ', $element->recipients) : (string)$element->recipients;
-            return '<div class="detailed-log-params-cell">' .
-                '<span class="param-tag param-email-recipients"><strong>' . DetailedLogHelper::translate('email.to', [], 'To:') . '</strong> ' . htmlspecialchars($recipients) . '</span>' .
-                '</div>';
+            return DetailedLogHelper::translate('email.to', [], 'To:') . ' ' . $recipients;
         }
 
         $highlights = DetailedLogHelper::getStructuredHighlights($element, $this->_isCurrentUserAssignedAuthor);
         $rawSettings = DetailedLogHelper::getRawSettings($element->getId());
         $settingCount = count($rawSettings);
 
-        $items = [];
+        $parts = [];
 
         // 1. File highlights
         if (!empty($highlights['files'])) {
             $f = $highlights['files'];
-            $fileLabel = '';
+            $fileParts = [];
             if (!empty($f['filename'])) {
-                $fileLabel .= '📄 <span class="param-filename" title="' . htmlspecialchars($f['filename']) . '">' . htmlspecialchars($f['filename']) . '</span>';
+                $fileParts[] = $f['filename'];
             }
             if (!empty($f['fileId'])) {
-                $fileLabel .= ' <small class="text-muted">(ID: ' . (int)$f['fileId'] . ')</small>';
+                $fileParts[] = 'ID: ' . $f['fileId'];
             }
             if (!empty($f['fileStageLabel'])) {
-                $fileLabel .= ' <span class="badge badge-filestage">' . htmlspecialchars($f['fileStageLabel']) . '</span>';
+                $fileParts[] = $f['fileStageLabel'];
             }
-            if ($fileLabel) {
-                $items[] = '<div class="param-row param-file">' . $fileLabel . '</div>';
+            if (!empty($fileParts)) {
+                $parts[] = 'File: ' . implode(', ', $fileParts);
             }
         }
 
@@ -259,54 +256,63 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
         if (!empty($highlights['decision'])) {
             $d = $highlights['decision'];
             $decFormatted = DetailedLogHelper::formatDecision($d['decision']);
-            $decHtml = '<span class="badge ' . $decFormatted['badge'] . '">⚖️ ' . htmlspecialchars($decFormatted['text']) . '</span>';
+            $decText = 'Decision: ' . $decFormatted['text'];
             if (!empty($d['editorName'])) {
-                $decHtml .= ' <small class="text-muted">' . DetailedLogHelper::translate('plugins.generic.detailedLog.byEditor', ['editor' => $d['editorName']], 'by ' . $d['editorName']) . '</small>';
+                $decText .= ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.byEditor', ['editor' => $d['editorName']], 'by ' . $d['editorName']);
             }
-            $items[] = '<div class="param-row param-decision">' . $decHtml . '</div>';
+            $parts[] = $decText;
         }
 
         // 3. Review highlights
         if (!empty($highlights['review'])) {
             $r = $highlights['review'];
-            $revHtml = '🔍 <strong>' . htmlspecialchars($r['reviewerName']) . '</strong>';
+            $revText = 'Reviewer: ' . $r['reviewerName'];
             if (!empty($r['round'])) {
-                $revHtml .= ' <span class="badge badge-round">' . DetailedLogHelper::translate('submission.round', ['round' => $r['round']], "Round {$r['round']}") . '</span>';
+                $revText .= ' (' . DetailedLogHelper::translate('submission.round', ['round' => $r['round']], "Round {$r['round']}") . ')';
             }
             if (!empty($r['reviewAssignmentId'])) {
-                $revHtml .= ' <small class="text-muted">(#' . (int)$r['reviewAssignmentId'] . ')</small>';
+                $revText .= ' [#' . $r['reviewAssignmentId'] . ']';
             }
-            $items[] = '<div class="param-row param-review">' . $revHtml . '</div>';
+            $parts[] = $revText;
         }
 
         // 4. Participant highlights
         if (!empty($highlights['participant'])) {
             $p = $highlights['participant'];
-            $partHtml = '👤 <strong>' . htmlspecialchars($p['fullName'] ?: $p['username']) . '</strong>';
+            $partText = 'User: ' . ($p['fullName'] ?: $p['username']);
             if (!empty($p['userGroup'])) {
-                $partHtml .= ' &mdash; <span class="badge badge-role">' . htmlspecialchars($p['userGroup']) . '</span>';
+                $partText .= ' (' . $p['userGroup'] . ')';
             }
-            $items[] = '<div class="param-row param-participant">' . $partHtml . '</div>';
+            $parts[] = $partText;
         }
 
-        // 5. Email highlights
+        // 5. Email communication highlights
         if (!empty($highlights['communication'])) {
             $c = $highlights['communication'];
-            $commHtml = '✉️ <em>' . htmlspecialchars($c['subject']) . '</em>';
+            $commText = 'Subject: ' . $c['subject'];
             if (!empty($c['recipient'])) {
-                $commHtml .= ' <small class="text-muted">(&rarr; ' . htmlspecialchars($c['recipient']) . ')</small>';
+                $commText .= ' -> ' . $c['recipient'];
             }
-            $items[] = '<div class="param-row param-comm">' . $commHtml . '</div>';
+            $parts[] = $commText;
         }
 
-        // Badge indicating total parameters in event_log_settings
-        $countBadge = '<span class="badge badge-settings-count" title="' . DetailedLogHelper::translate('plugins.generic.detailedLog.settingsCountTooltip', ['count' => $settingCount], "{$settingCount} settings stored in event_log_settings") . '">' .
-            $settingCount . ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.params', [], 'params') . '</span>';
-
-        if (empty($items)) {
-            return '<div class="detailed-log-params-cell">' . $countBadge . '</div>';
+        // If no structured highlights were extracted, show key raw settings
+        if (empty($parts) && !empty($rawSettings)) {
+            $settingPairs = [];
+            foreach ($rawSettings as $s) {
+                if ($s['value'] !== null && $s['value'] !== '') {
+                    $settingPairs[] = $s['name'] . ': ' . $s['value'];
+                }
+            }
+            if (!empty($settingPairs)) {
+                $parts[] = implode(', ', array_slice($settingPairs, 0, 3));
+            }
         }
 
-        return '<div class="detailed-log-params-cell">' . implode('', $items) . ' <div class="param-meta">' . $countBadge . '</div></div>';
+        if ($settingCount > 0) {
+            $parts[] = '[' . $settingCount . ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.params', [], 'params') . ']';
+        }
+
+        return implode(' | ', $parts);
     }
 }
