@@ -53,10 +53,14 @@ class DetailedSubmissionFileEventLogGridHandler extends DetailedSubmissionEventL
      */
     public function initialize($request, $args = null)
     {
-        parent::initialize($request, $args);
+        try {
+            parent::initialize($request, $args);
 
-        $submissionFile = $this->getAuthorizedContextObject(Application::ASSOC_TYPE_SUBMISSION_FILE);
-        $this->setSubmissionFile($submissionFile);
+            $submissionFile = $this->getAuthorizedContextObject(Application::ASSOC_TYPE_SUBMISSION_FILE);
+            $this->setSubmissionFile($submissionFile);
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error initializing DetailedSubmissionFileEventLogGridHandler', $e);
+        }
     }
 
     /**
@@ -64,13 +68,18 @@ class DetailedSubmissionFileEventLogGridHandler extends DetailedSubmissionEventL
      */
     public function getRequestArgs()
     {
-        $submissionFile = $this->getSubmissionFile();
+        try {
+            $submissionFile = $this->getSubmissionFile();
 
-        return [
-            'submissionId' => $submissionFile ? $submissionFile->getData('submissionId') : null,
-            'submissionFileId' => $submissionFile ? $submissionFile->getId() : null,
-            'stageId' => $this->_stageId,
-        ];
+            return [
+                'submissionId' => $submissionFile ? $submissionFile->getData('submissionId') : null,
+                'submissionFileId' => $submissionFile ? $submissionFile->getId() : null,
+                'stageId' => $this->_stageId,
+            ];
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error getting request args in DetailedSubmissionFileEventLogGridHandler', $e);
+            return [];
+        }
     }
 
     /**
@@ -78,31 +87,36 @@ class DetailedSubmissionFileEventLogGridHandler extends DetailedSubmissionEventL
      */
     protected function loadData($request, $filter = null)
     {
-        $submissionFile = $this->getSubmissionFile();
-        if (!$submissionFile) {
+        try {
+            $submissionFile = $this->getSubmissionFile();
+            if (!$submissionFile) {
+                return [];
+            }
+
+            $fileId = $submissionFile->getId();
+
+            $entries = Repo::eventLog()->getCollector()
+                ->filterByAssoc(PKPApplication::ASSOC_TYPE_SUBMISSION_FILE, [$fileId])
+                ->getMany()
+                ->toArray();
+
+            $logIds = array_map(fn($e) => $e->getId(), $entries);
+            DetailedLogHelper::preloadSettings($logIds);
+
+            // Sort by date, most recent first
+            usort($entries, function ($a, $b) {
+                $aDate = $a->getDateLogged();
+                $bDate = $b->getDateLogged();
+                if ($aDate == $bDate) {
+                    return 0;
+                }
+                return $aDate < $bDate ? 1 : -1;
+            });
+
+            return array_values($entries);
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error loading data in DetailedSubmissionFileEventLogGridHandler', $e);
             return [];
         }
-
-        $fileId = $submissionFile->getId();
-
-        $entries = Repo::eventLog()->getCollector()
-            ->filterByAssoc(PKPApplication::ASSOC_TYPE_SUBMISSION_FILE, [$fileId])
-            ->getMany()
-            ->toArray();
-
-        $logIds = array_map(fn($e) => $e->getId(), $entries);
-        DetailedLogHelper::preloadSettings($logIds);
-
-        // Sort by date, most recent first
-        usort($entries, function ($a, $b) {
-            $aDate = $a->getDateLogged();
-            $bDate = $b->getDateLogged();
-            if ($aDate == $bDate) {
-                return 0;
-            }
-            return $aDate < $bDate ? 1 : -1;
-        });
-
-        return array_values($entries);
     }
 }

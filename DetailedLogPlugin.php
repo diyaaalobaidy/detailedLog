@@ -90,28 +90,33 @@ class DetailedLogPlugin extends GenericPlugin
      */
     public function register($category, $path, $mainContextId = null)
     {
-        if (parent::register($category, $path, $mainContextId)) {
-            $localePath = __DIR__ . '/locale';
-            if (is_dir($localePath)) {
-                \PKP\facades\Locale::registerPath($localePath);
+        try {
+            if (parent::register($category, $path, $mainContextId)) {
+                $localePath = __DIR__ . '/locale';
+                if (is_dir($localePath)) {
+                    \PKP\facades\Locale::registerPath($localePath);
+                }
+
+                if ($this->getEnabled($mainContextId)) {
+                    // Initialize universal database activity & lifecycle recorder
+                    classes\DetailedActivityRecorder::init();
+
+                    // Intercept component routing for Submission Event Log grids
+                    Hook::add('LoadComponentHandler', $this->handleComponentRouting(...));
+
+                    // Add stylesheet to backend templates
+                    Hook::add('TemplateManager::display', $this->setupStylesheet(...));
+
+                    // Fallback hook if grid is initialized directly
+                    Hook::add('submissioneventloggridhandler::initfeatures', $this->handleGridFeatures(...));
+                }
+                return true;
             }
-
-            if ($this->getEnabled($mainContextId)) {
-                // Initialize universal database activity & lifecycle recorder
-                classes\DetailedActivityRecorder::init();
-
-                // Intercept component routing for Submission Event Log grids
-                Hook::add('LoadComponentHandler', $this->handleComponentRouting(...));
-
-                // Add stylesheet to backend templates
-                Hook::add('TemplateManager::display', $this->setupStylesheet(...));
-
-                // Fallback hook if grid is initialized directly
-                Hook::add('submissioneventloggridhandler::initfeatures', $this->handleGridFeatures(...));
-            }
-            return true;
+            return false;
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error registering DetailedLogPlugin', $e);
+            return false;
         }
-        return false;
     }
 
     /**
@@ -119,28 +124,32 @@ class DetailedLogPlugin extends GenericPlugin
      */
     public function handleComponentRouting(string $hookName, array $params): bool
     {
-        $component = &$params[0];
-        $op = &$params[1];
-        $componentInstance = &$params[2];
+        try {
+            $component = &$params[0];
+            $op = &$params[1];
+            $componentInstance = &$params[2];
 
-        if ($component === 'grid.eventLog.SubmissionEventLogGridHandler') {
-            $componentInstance = new DetailedSubmissionEventLogGridHandler($this);
-            return Hook::ABORT;
-        }
+            if ($component === 'grid.eventLog.SubmissionEventLogGridHandler') {
+                $componentInstance = new DetailedSubmissionEventLogGridHandler($this);
+                return Hook::ABORT;
+            }
 
-        if ($component === 'grid.eventLog.SubmissionFileEventLogGridHandler') {
-            $componentInstance = new DetailedSubmissionFileEventLogGridHandler($this);
-            return Hook::ABORT;
-        }
+            if ($component === 'grid.eventLog.SubmissionFileEventLogGridHandler') {
+                $componentInstance = new DetailedSubmissionFileEventLogGridHandler($this);
+                return Hook::ABORT;
+            }
 
-        if ($component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionEventLogGridHandler') {
-            $componentInstance = new DetailedSubmissionEventLogGridHandler($this);
-            return Hook::ABORT;
-        }
+            if ($component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionEventLogGridHandler') {
+                $componentInstance = new DetailedSubmissionEventLogGridHandler($this);
+                return Hook::ABORT;
+            }
 
-        if ($component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionFileEventLogGridHandler') {
-            $componentInstance = new DetailedSubmissionFileEventLogGridHandler($this);
-            return Hook::ABORT;
+            if ($component === 'plugins.generic.detailedLog.controllers.grid.DetailedSubmissionFileEventLogGridHandler') {
+                $componentInstance = new DetailedSubmissionFileEventLogGridHandler($this);
+                return Hook::ABORT;
+            }
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error in handleComponentRouting', $e);
         }
 
         return Hook::CONTINUE;
@@ -151,14 +160,18 @@ class DetailedLogPlugin extends GenericPlugin
      */
     public function setupStylesheet(string $hookName, array $args): bool
     {
-        $templateMgr = $args[0]; /** @var TemplateManager $templateMgr */
-        $request = Application::get()->getRequest();
+        try {
+            $templateMgr = $args[0]; /** @var TemplateManager $templateMgr */
+            $request = Application::get()->getRequest();
 
-        $templateMgr->addStyleSheet(
-            'detailedLogPluginCss',
-            $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
-            ['contexts' => ['backend']]
-        );
+            $templateMgr->addStyleSheet(
+                'detailedLogPluginCss',
+                $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
+                ['contexts' => ['backend']]
+            );
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error in setupStylesheet', $e);
+        }
 
         return Hook::CONTINUE;
     }
@@ -168,16 +181,20 @@ class DetailedLogPlugin extends GenericPlugin
      */
     public function handleGridFeatures(string $hookName, array $args): bool
     {
-        $grid = $args[0];
-        $request = $args[1];
+        try {
+            $grid = $args[0];
+            $request = $args[1];
 
-        // Ensure stylesheet is added when grid is rendered
-        $templateMgr = TemplateManager::getManager($request);
-        $templateMgr->addStyleSheet(
-            'detailedLogPluginCss',
-            $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
-            ['contexts' => ['backend']]
-        );
+            // Ensure stylesheet is added when grid is rendered
+            $templateMgr = TemplateManager::getManager($request);
+            $templateMgr->addStyleSheet(
+                'detailedLogPluginCss',
+                $request->getBaseUrl() . '/' . $this->getPluginPath() . '/css/detailedLog.css',
+                ['contexts' => ['backend']]
+            );
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error in handleGridFeatures', $e);
+        }
 
         return Hook::CONTINUE;
     }
@@ -187,24 +204,29 @@ class DetailedLogPlugin extends GenericPlugin
      */
     public function getActions($request, $actionArgs)
     {
-        $actions = parent::getActions($request, $actionArgs);
-        if (!$this->getEnabled()) {
+        try {
+            $actions = parent::getActions($request, $actionArgs);
+            if (!$this->getEnabled()) {
+                return $actions;
+            }
+
+            $router = $request->getRouter();
+            $actions[] = new LinkAction(
+                'detailedLogStats',
+                new AjaxModal(
+                    $router->url($request, null, null, 'manage', null, ['verb' => 'stats', 'plugin' => $this->getName(), 'category' => 'generic']),
+                    DetailedLogHelper::translate('plugins.generic.detailedLog.displayName', [], 'Detailed Activity Log Plugin'),
+                    'modal_information'
+                ),
+                DetailedLogHelper::translate('common.information', [], 'Information'),
+                'information'
+            );
+
             return $actions;
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error in getActions', $e);
+            return parent::getActions($request, $actionArgs);
         }
-
-        $router = $request->getRouter();
-        $actions[] = new LinkAction(
-            'detailedLogStats',
-            new AjaxModal(
-                $router->url($request, null, null, 'manage', null, ['verb' => 'stats', 'plugin' => $this->getName(), 'category' => 'generic']),
-                DetailedLogHelper::translate('plugins.generic.detailedLog.displayName', [], 'Detailed Activity Log Plugin'),
-                'modal_information'
-            ),
-            DetailedLogHelper::translate('common.information', [], 'Information'),
-            'information'
-        );
-
-        return $actions;
     }
 
     /**
@@ -212,36 +234,49 @@ class DetailedLogPlugin extends GenericPlugin
      */
     public function manage($args, $request)
     {
-        $verb = $args['verb'] ?? null;
-        if ($verb === 'stats') {
-            $totalEvents = DB::table('event_log')->count();
-            $totalSettings = DB::table('event_log_settings')->count();
-            $distinctSettingNames = DB::table('event_log_settings')->distinct('setting_name')->count('setting_name');
+        try {
+            $verb = $args['verb'] ?? null;
+            if ($verb === 'stats') {
+                $totalEvents = 0;
+                $totalSettings = 0;
+                $distinctSettingNames = 0;
 
-            $html = '<div style="padding: 15px; font-size: 0.95em; line-height: 1.6;">';
-            $html .= '<h3 style="margin-top: 0;">🔍 ' . htmlspecialchars($this->getDisplayName()) . '</h3>';
-            $html .= '<p>' . htmlspecialchars($this->getDescription()) . '</p>';
-            $html .= '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">';
-            $html .= '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 15px;">';
-            $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
-            $html .= '<div style="font-size: 1.6em; font-weight: 700; color: #1e40af;">' . number_format($totalEvents) . '</div>';
-            $html .= '<small style="color: #64748b;">Total Event Log Entries</small>';
-            $html .= '</div>';
-            $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
-            $html .= '<div style="font-size: 1.6em; font-weight: 700; color: #166534;">' . number_format($totalSettings) . '</div>';
-            $html .= '<small style="color: #64748b;">Total Settings in event_log_settings</small>';
-            $html .= '</div>';
-            $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
-            $html .= '<div style="font-size: 1.6em; font-weight: 700; color: #92400e;">' . number_format($distinctSettingNames) . '</div>';
-            $html .= '<small style="color: #64748b;">Distinct Setting Types</small>';
-            $html .= '</div>';
-            $html .= '</div>';
-            $html .= '<p style="color: #15803d; font-weight: 600;">✓ Plugin is active. All Activity Logs automatically display complete detailed metadata and export options.</p>';
-            $html .= '</div>';
+                try {
+                    $totalEvents = DB::table('event_log')->count();
+                    $totalSettings = DB::table('event_log_settings')->count();
+                    $distinctSettingNames = DB::table('event_log_settings')->distinct('setting_name')->count('setting_name');
+                } catch (\Throwable $dbEx) {
+                    DetailedLogHelper::logError('Error querying event stats in manage()', $dbEx);
+                }
 
-            return new JSONMessage(true, $html);
+                $html = '<div style="padding: 15px; font-size: 0.95em; line-height: 1.6;">';
+                $html .= '<h3 style="margin-top: 0;">🔍 ' . htmlspecialchars($this->getDisplayName()) . '</h3>';
+                $html .= '<p>' . htmlspecialchars($this->getDescription()) . '</p>';
+                $html .= '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">';
+                $html .= '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 15px;">';
+                $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
+                $html .= '<div style="font-size: 1.6em; font-weight: 700; color: #1e40af;">' . number_format($totalEvents) . '</div>';
+                $html .= '<small style="color: #64748b;">Total Event Log Entries</small>';
+                $html .= '</div>';
+                $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
+                $html .= '<div style="font-size: 1.6em; font-weight: 700; color: #166534;">' . number_format($totalSettings) . '</div>';
+                $html .= '<small style="color: #64748b;">Total Settings in event_log_settings</small>';
+                $html .= '</div>';
+                $html .= '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; text-align: center;">';
+                $html .= '<div style="font-size: 1.6em; font-weight: 700; color: #92400e;">' . number_format($distinctSettingNames) . '</div>';
+                $html .= '<small style="color: #64748b;">Distinct Setting Types</small>';
+                $html .= '</div>';
+                $html .= '</div>';
+                $html .= '<p style="color: #15803d; font-weight: 600;">✓ Plugin is active. All Activity Logs automatically display complete detailed metadata and export options.</p>';
+                $html .= '</div>';
+
+                return new JSONMessage(true, $html);
+            }
+
+            return parent::manage($args, $request);
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error in manage()', $e);
+            return new JSONMessage(false, 'An unexpected error occurred while loading plugin details.');
         }
-
-        return parent::manage($args, $request);
     }
 }

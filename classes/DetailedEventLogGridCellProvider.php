@@ -46,19 +46,26 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
      */
     public function getTemplateVarsFromRowColumn($row, $column)
     {
-        $element = $row->getData();
-        $columnId = $column->getId();
+        try {
+            $element = $row->getData();
+            $columnId = $column->getId();
 
-        assert(($element instanceof \PKP\core\DataObject || $element instanceof EmailLogEntry) && !empty($columnId));
+            if (!$element || empty($columnId)) {
+                return ['label' => ''];
+            }
 
-        return match ($columnId) {
-            'date' => ['label' => $this->renderDateCell($element)],
-            'user' => ['label' => $this->renderUserCell($element)],
-            'event' => ['label' => $this->renderEventCell($element)],
-            'stage' => ['label' => $this->renderStageCell($element)],
-            'details' => ['label' => $this->renderDetailsCell($element)],
-            default => ['label' => ''],
-        };
+            return match ($columnId) {
+                'date' => ['label' => $this->renderDateCell($element)],
+                'user' => ['label' => $this->renderUserCell($element)],
+                'event' => ['label' => $this->renderEventCell($element)],
+                'stage' => ['label' => $this->renderStageCell($element)],
+                'details' => ['label' => $this->renderDetailsCell($element)],
+                default => ['label' => ''],
+            };
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error in getTemplateVarsFromRowColumn', $e);
+            return ['label' => ''];
+        }
     }
 
     /**
@@ -66,12 +73,17 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
      */
     protected function renderDateCell(EventLogEntry|EmailLogEntry $element): string
     {
-        $dateStr = $element instanceof EventLogEntry ? $element->getDateLogged() : $element->dateSent;
-        if (!$dateStr) {
+        try {
+            $dateStr = $element instanceof EventLogEntry ? $element->getDateLogged() : $element->dateSent;
+            if (!$dateStr) {
+                return '';
+            }
+            $timestamp = strtotime($dateStr);
+            return date('Y-m-d H:i:s', $timestamp);
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error rendering date cell', $e);
             return '';
         }
-        $timestamp = strtotime($dateStr);
-        return date('Y-m-d H:i:s', $timestamp);
     }
 
     /**
@@ -79,108 +91,113 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
      */
     protected function renderUserCell(EventLogEntry|EmailLogEntry $element): string
     {
-        if ($element instanceof EmailLogEntry) {
-            $senderInfo = DetailedLogHelper::getEmailSenderInfo($element);
-            $userStr = $senderInfo['name'];
-            if (!empty($senderInfo['email']) && $senderInfo['email'] !== $senderInfo['name']) {
-                $userStr .= ' (' . $senderInfo['email'] . ')';
-            }
-            return $userStr;
-        }
-
-        $userName = null;
         try {
-            $userName = $element->getUserFullName();
+            if ($element instanceof EmailLogEntry) {
+                $senderInfo = DetailedLogHelper::getEmailSenderInfo($element);
+                $userStr = $senderInfo['name'];
+                if (!empty($senderInfo['email']) && $senderInfo['email'] !== $senderInfo['name']) {
+                    $userStr .= ' (' . $senderInfo['email'] . ')';
+                }
+                return $userStr;
+            }
+
+            $userName = null;
+            try {
+                $userName = $element->getUserFullName();
+            } catch (\Throwable $e) {
+            }
+            $username = $element->getData('username');
+            $userGroup = $element->getData('userGroupName');
+            if (is_array($userGroup)) {
+                $userGroup = current($userGroup);
+            }
+
+            // Anonymize reviewer details where necessary
+            if ($this->_isCurrentUserAssignedAuthor) {
+                $reviewerLogTypes = [
+                    PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_ACCEPT,
+                    PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_DECLINE,
+                    PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_UNCONSIDERED,
+                    PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_ASSIGN,
+                ];
+                if (in_array($element->getEventType(), $reviewerLogTypes)) {
+                    $userName = DetailedLogHelper::translate('editor.review.anonymousReviewer', [], 'Anonymous Reviewer');
+                    $username = null;
+                    $userGroup = DetailedLogHelper::translate('user.role.reviewer', [], 'Reviewer');
+                    if ($reviewAssignmentId = $element->getData('reviewAssignmentId')) {
+                        $reviewAssignment = Repo::reviewAssignment()->get($reviewAssignmentId);
+                        if ($reviewAssignment && $reviewAssignment->getReviewMethod() === ReviewAssignment::SUBMISSION_REVIEW_METHOD_OPEN) {
+                            try {
+                                $userName = $element->getUserFullName();
+                            } catch (\Throwable $e) {
+                            }
+                            $username = $element->getData('username');
+                        }
+                    }
+                }
+
+                // Anonymize reviewer files
+                $fileStage = $element->getData('fileStage');
+                if ($fileStage && $fileStage === SubmissionFile::SUBMISSION_FILE_REVIEW_ATTACHMENT) {
+                    $submissionFileId = $element->getData('submissionFileId');
+                    if ($submissionFileId) {
+                        $submissionFile = Repo::submissionFile()->get($submissionFileId);
+                        if ($submissionFile && $submissionFile->getData('assocType') === Application::ASSOC_TYPE_REVIEW_ASSIGNMENT) {
+                            $reviewAssignment = Repo::reviewAssignment()->get($submissionFile->getData('assocId'));
+                            if (!$reviewAssignment || in_array($reviewAssignment->getReviewMethod(), [ReviewAssignment::SUBMISSION_REVIEW_METHOD_ANONYMOUS, ReviewAssignment::SUBMISSION_REVIEW_METHOD_DOUBLEANONYMOUS])) {
+                                $userName = DetailedLogHelper::translate('editor.review.anonymousReviewer', [], 'Anonymous Reviewer');
+                                $username = null;
+                                $userGroup = DetailedLogHelper::translate('user.role.reviewer', [], 'Reviewer');
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (empty($userName) && $element->getUserId()) {
+                $userDetails = DetailedLogHelper::getUserDetails($element->getUserId());
+                if ($userDetails) {
+                    $userName = $userDetails['fullName'];
+                    if (empty($username)) {
+                        $username = $userDetails['username'];
+                    }
+                }
+            }
+
+            if (empty($userName)) {
+                $userName = DetailedLogHelper::translate('plugins.generic.detailedLog.systemUser', [], 'System / Automated');
+            }
+
+            $userStr = $userName;
+            if (!empty($username) && $username !== $userName) {
+                $userStr .= ' (@' . $username . ')';
+            }
+            if (!empty($userGroup)) {
+                $userStr .= ' [' . $userGroup . ']';
+            }
+
+            // Append real client IP if available
+            $realIp = $element->getData('realIp') ?: null;
+            if (!$realIp) {
+                $rawSettings = DetailedLogHelper::getRawSettings($element->getId());
+                foreach ($rawSettings as $s) {
+                    if ($s['name'] === 'realIp') {
+                        $realIp = $s['value'];
+                        break;
+                    } elseif ($s['name'] === 'ipAddress' && !$realIp) {
+                        $realIp = $s['value'];
+                    }
+                }
+            }
+            if (!empty($realIp)) {
+                $userStr .= ' (' . $realIp . ')';
+            }
+
+            return $userStr;
         } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error rendering user cell', $e);
+            return '—';
         }
-        $username = $element->getData('username');
-        $userGroup = $element->getData('userGroupName');
-        if (is_array($userGroup)) {
-            $userGroup = current($userGroup);
-        }
-
-        // Anonymize reviewer details where necessary
-        if ($this->_isCurrentUserAssignedAuthor) {
-            $reviewerLogTypes = [
-                PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_ACCEPT,
-                PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_DECLINE,
-                PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_UNCONSIDERED,
-                PKPSubmissionEventLogEntry::SUBMISSION_LOG_REVIEW_ASSIGN,
-            ];
-            if (in_array($element->getEventType(), $reviewerLogTypes)) {
-                $userName = DetailedLogHelper::translate('editor.review.anonymousReviewer', [], 'Anonymous Reviewer');
-                $username = null;
-                $userGroup = DetailedLogHelper::translate('user.role.reviewer', [], 'Reviewer');
-                if ($reviewAssignmentId = $element->getData('reviewAssignmentId')) {
-                    $reviewAssignment = Repo::reviewAssignment()->get($reviewAssignmentId);
-                    if ($reviewAssignment && $reviewAssignment->getReviewMethod() === ReviewAssignment::SUBMISSION_REVIEW_METHOD_OPEN) {
-                        try {
-                            $userName = $element->getUserFullName();
-                        } catch (\Throwable $e) {
-                        }
-                        $username = $element->getData('username');
-                    }
-                }
-            }
-
-            // Anonymize reviewer files
-            $fileStage = $element->getData('fileStage');
-            if ($fileStage && $fileStage === SubmissionFile::SUBMISSION_FILE_REVIEW_ATTACHMENT) {
-                $submissionFileId = $element->getData('submissionFileId');
-                if ($submissionFileId) {
-                    $submissionFile = Repo::submissionFile()->get($submissionFileId);
-                    if ($submissionFile && $submissionFile->getData('assocType') === Application::ASSOC_TYPE_REVIEW_ASSIGNMENT) {
-                        $reviewAssignment = Repo::reviewAssignment()->get($submissionFile->getData('assocId'));
-                        if (!$reviewAssignment || in_array($reviewAssignment->getReviewMethod(), [ReviewAssignment::SUBMISSION_REVIEW_METHOD_ANONYMOUS, ReviewAssignment::SUBMISSION_REVIEW_METHOD_DOUBLEANONYMOUS])) {
-                            $userName = DetailedLogHelper::translate('editor.review.anonymousReviewer', [], 'Anonymous Reviewer');
-                            $username = null;
-                            $userGroup = DetailedLogHelper::translate('user.role.reviewer', [], 'Reviewer');
-                        }
-                    }
-                }
-            }
-        }
-
-        if (empty($userName) && $element->getUserId()) {
-            $userDetails = DetailedLogHelper::getUserDetails($element->getUserId());
-            if ($userDetails) {
-                $userName = $userDetails['fullName'];
-                if (empty($username)) {
-                    $username = $userDetails['username'];
-                }
-            }
-        }
-
-        if (empty($userName)) {
-            $userName = DetailedLogHelper::translate('plugins.generic.detailedLog.systemUser', [], 'System / Automated');
-        }
-
-        $userStr = $userName;
-        if (!empty($username) && $username !== $userName) {
-            $userStr .= ' (@' . $username . ')';
-        }
-        if (!empty($userGroup)) {
-            $userStr .= ' [' . $userGroup . ']';
-        }
-
-        // Append real client IP if available
-        $realIp = $element->getData('realIp') ?: null;
-        if (!$realIp) {
-            $rawSettings = DetailedLogHelper::getRawSettings($element->getId());
-            foreach ($rawSettings as $s) {
-                if ($s['name'] === 'realIp') {
-                    $realIp = $s['value'];
-                    break;
-                } elseif ($s['name'] === 'ipAddress' && !$realIp) {
-                    $realIp = $s['value'];
-                }
-            }
-        }
-        if (!empty($realIp)) {
-            $userStr .= ' (' . $realIp . ')';
-        }
-
-        return $userStr;
     }
 
     /**
@@ -188,21 +205,26 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
      */
     protected function renderEventCell(EventLogEntry|EmailLogEntry $element): string
     {
-        $cat = DetailedLogHelper::getEventCategory($element);
-
-        if ($element instanceof EmailLogEntry) {
-            return '[' . $cat['name'] . '] ' . ($element->subject ?: 'Notification');
-        }
-
-        $translated = '';
         try {
-            $translated = $element->getTranslatedMessage(null, $this->_isCurrentUserAssignedAuthor);
-        } catch (\Throwable $e) {
-            $translated = (string) $element->getMessage();
-        }
-        $logId = $element->getId();
+            $cat = DetailedLogHelper::getEventCategory($element);
 
-        return '[' . $cat['name'] . '] ' . $translated . ' (#' . $logId . ')';
+            if ($element instanceof EmailLogEntry) {
+                return '[' . $cat['name'] . '] ' . ($element->subject ?: 'Notification');
+            }
+
+            $translated = '';
+            try {
+                $translated = $element->getTranslatedMessage(null, $this->_isCurrentUserAssignedAuthor);
+            } catch (\Throwable $e) {
+                $translated = (string) $element->getMessage();
+            }
+            $logId = $element->getId();
+
+            return '[' . $cat['name'] . '] ' . $translated . ' (#' . $logId . ')';
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error rendering event cell', $e);
+            return '—';
+        }
     }
 
     /**
@@ -210,29 +232,34 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
      */
     protected function renderStageCell(EventLogEntry|EmailLogEntry $element): string
     {
-        if ($element instanceof EmailLogEntry) {
-            return DetailedLogHelper::translate('plugins.generic.detailedLog.emailNotice', [], 'Notification');
-        }
-
-        $stageId = $element->getData('stageId');
-        $round = $element->getData('round');
-        $fileStage = $element->getData('fileStage');
-
-        $label = '';
-        if ($stageId) {
-            $label = DetailedLogHelper::formatStageId((int)$stageId);
-            if ($round && $stageId == 3) {
-                $label .= ' (' . DetailedLogHelper::translate('submission.round', ['round' => $round], "Round {$round}") . ')';
+        try {
+            if ($element instanceof EmailLogEntry) {
+                return DetailedLogHelper::translate('plugins.generic.detailedLog.emailNotice', [], 'Notification');
             }
-        } elseif ($fileStage) {
-            $label = DetailedLogHelper::formatFileStage((int)$fileStage);
-        }
 
-        if (!$label) {
-            $label = DetailedLogHelper::translate('plugins.generic.detailedLog.generalWorkflow', [], 'General');
-        }
+            $stageId = $element->getData('stageId');
+            $round = $element->getData('round');
+            $fileStage = $element->getData('fileStage');
 
-        return $label;
+            $label = '';
+            if ($stageId) {
+                $label = DetailedLogHelper::formatStageId((int)$stageId);
+                if ($round && $stageId == 3) {
+                    $label .= ' (' . DetailedLogHelper::translate('submission.round', ['round' => $round], "Round {$round}") . ')';
+                }
+            } elseif ($fileStage) {
+                $label = DetailedLogHelper::formatFileStage((int)$fileStage);
+            }
+
+            if (!$label) {
+                $label = DetailedLogHelper::translate('plugins.generic.detailedLog.generalWorkflow', [], 'General');
+            }
+
+            return $label;
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error rendering stage cell', $e);
+            return '—';
+        }
     }
 
     /**
@@ -240,136 +267,142 @@ class DetailedEventLogGridCellProvider extends DataObjectGridCellProvider
      */
     protected function renderDetailsCell(EventLogEntry|EmailLogEntry $element): string
     {
-        if ($element instanceof EmailLogEntry) {
-            $recipients = is_array($element->recipients) ? implode(', ', $element->recipients) : (string)$element->recipients;
-            return DetailedLogHelper::translate('email.to', [], 'To:') . ' ' . $recipients;
-        }
+        try {
+            if ($element instanceof EmailLogEntry) {
+                $recipients = is_array($element->recipients) ? implode(', ', $element->recipients) : (string)$element->recipients;
+                return DetailedLogHelper::translate('email.to', [], 'To:') . ' ' . $recipients;
+            }
 
-        $highlights = DetailedLogHelper::getStructuredHighlights($element, $this->_isCurrentUserAssignedAuthor);
-        $rawSettings = DetailedLogHelper::getRawSettings($element->getId());
-        $settingCount = count($rawSettings);
+            $highlights = DetailedLogHelper::getStructuredHighlights($element, $this->_isCurrentUserAssignedAuthor);
+            $rawSettings = DetailedLogHelper::getRawSettings($element->getId());
+            $settingCount = count($rawSettings);
 
-        $parts = [];
+            $parts = [];
 
-        // 1. File highlights
-        if (!empty($highlights['files'])) {
-            $f = $highlights['files'];
-            $fileParts = [];
-            if (!empty($f['filename'])) {
-                $fileParts[] = $f['filename'];
+            // 1. File highlights
+            if (!empty($highlights['files'])) {
+                $f = $highlights['files'];
+                $fileParts = [];
+                if (!empty($f['filename'])) {
+                    $fileParts[] = $f['filename'];
+                }
+                if (!empty($f['fileId'])) {
+                    $fileParts[] = 'ID: ' . $f['fileId'];
+                }
+                if (!empty($f['fileStageLabel'])) {
+                    $fileStage = $f['fileStageLabel'];
+                    $fileParts[] = $fileStage;
+                }
+                if (!empty($fileParts)) {
+                    $parts[] = 'File: ' . implode(', ', $fileParts);
+                }
             }
-            if (!empty($f['fileId'])) {
-                $fileParts[] = 'ID: ' . $f['fileId'];
-            }
-            if (!empty($f['fileStageLabel'])) {
-                $fileParts[] = $f['fileStageLabel'];
-            }
-            if (!empty($fileParts)) {
-                $parts[] = 'File: ' . implode(', ', $fileParts);
-            }
-        }
 
-        // 2. Decision highlights
-        if (!empty($highlights['decision'])) {
-            $d = $highlights['decision'];
-            $decFormatted = DetailedLogHelper::formatDecision($d['decision']);
-            $decText = 'Decision: ' . $decFormatted['text'];
-            if (!empty($d['editorName'])) {
-                $decText .= ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.byEditor', ['editor' => $d['editorName']], 'by ' . $d['editorName']);
+            // 2. Decision highlights
+            if (!empty($highlights['decision'])) {
+                $d = $highlights['decision'];
+                $decFormatted = DetailedLogHelper::formatDecision($d['decision']);
+                $decText = 'Decision: ' . $decFormatted['text'];
+                if (!empty($d['editorName'])) {
+                    $decText .= ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.byEditor', ['editor' => $d['editorName']], 'by ' . $d['editorName']);
+                }
+                $parts[] = $decText;
             }
-            $parts[] = $decText;
-        }
 
-        // 3. Review highlights
-        if (!empty($highlights['review'])) {
-            $r = $highlights['review'];
-            $revText = 'Reviewer: ' . $r['reviewerName'];
-            if (!empty($r['round'])) {
-                $revText .= ' (' . DetailedLogHelper::translate('submission.round', ['round' => $r['round']], "Round {$r['round']}") . ')';
+            // 3. Review highlights
+            if (!empty($highlights['review'])) {
+                $r = $highlights['review'];
+                $revText = 'Reviewer: ' . $r['reviewerName'];
+                if (!empty($r['round'])) {
+                    $revText .= ' (' . DetailedLogHelper::translate('submission.round', ['round' => $r['round']], "Round {$r['round']}") . ')';
+                }
+                if (!empty($r['reviewAssignmentId'])) {
+                    $revText .= ' [#' . $r['reviewAssignmentId'] . ']';
+                }
+                $parts[] = $revText;
             }
-            if (!empty($r['reviewAssignmentId'])) {
-                $revText .= ' [#' . $r['reviewAssignmentId'] . ']';
-            }
-            $parts[] = $revText;
-        }
 
-        // 4. Participant highlights
-        if (!empty($highlights['participant'])) {
-            $p = $highlights['participant'];
-            $partText = 'User: ' . ($p['fullName'] ?: $p['username']);
-            if (!empty($p['userGroup'])) {
-                $partText .= ' (' . $p['userGroup'] . ')';
+            // 4. Participant highlights
+            if (!empty($highlights['participant'])) {
+                $p = $highlights['participant'];
+                $partText = 'User: ' . ($p['fullName'] ?: $p['username']);
+                if (!empty($p['userGroup'])) {
+                    $partText .= ' (' . $p['userGroup'] . ')';
+                }
+                $parts[] = $partText;
             }
-            $parts[] = $partText;
-        }
 
-        // 5. Email communication highlights
-        if (!empty($highlights['communication'])) {
-            $c = $highlights['communication'];
-            $commText = 'Subject: ' . $c['subject'];
-            if (!empty($c['recipient'])) {
-                $commText .= ' -> ' . $c['recipient'];
+            // 5. Email communication highlights
+            if (!empty($highlights['communication'])) {
+                $c = $highlights['communication'];
+                $commText = 'Subject: ' . $c['subject'];
+                if (!empty($c['recipient'])) {
+                    $commText .= ' -> ' . $c['recipient'];
+                }
+                $parts[] = $commText;
             }
-            $parts[] = $commText;
-        }
 
-        // 6. Contributor highlights
-        if (!empty($highlights['contributor'])) {
-            $co = $highlights['contributor'];
-            $coText = 'Contributor: ' . $co['authorName'];
-            if (!empty($co['email'])) {
-                $coText .= ' <' . $co['email'] . '>';
+            // 6. Contributor highlights
+            if (!empty($highlights['contributor'])) {
+                $co = $highlights['contributor'];
+                $coText = 'Contributor: ' . $co['authorName'];
+                if (!empty($co['email'])) {
+                    $coText .= ' <' . $co['email'] . '>';
+                }
+                $parts[] = $coText;
             }
-            $parts[] = $coText;
-        }
 
-        // 7. Discussion / Note highlights
-        if (!empty($highlights['discussion'])) {
-            $disc = $highlights['discussion'];
-            $discText = 'Note by ' . ($disc['author'] ?: 'User');
-            if (!empty($disc['title'])) {
-                $discText .= ': ' . $disc['title'];
-            } elseif (!empty($disc['excerpt'])) {
-                $discText .= ': ' . $disc['excerpt'];
+            // 7. Discussion / Note highlights
+            if (!empty($highlights['discussion'])) {
+                $disc = $highlights['discussion'];
+                $discText = 'Note by ' . ($disc['author'] ?: 'User');
+                if (!empty($disc['title'])) {
+                    $discText .= ': ' . $disc['title'];
+                } elseif (!empty($disc['excerpt'])) {
+                    $discText .= ': ' . $disc['excerpt'];
+                }
+                $parts[] = $discText;
             }
-            $parts[] = $discText;
-        }
 
-        // 8. Database activity highlights
-        if (!empty($highlights['database'])) {
-            $db = $highlights['database'];
-            $dbText = $db['tableName'] . ' [' . $db['operation'] . ']';
-            if (!empty($db['fields'])) {
-                $fieldSummary = [];
-                foreach ($db['fields'] as $fn => $fv) {
-                    $fvStr = (string)$fv;
-                    if (mb_strlen($fvStr) > 35) {
-                        $fvStr = mb_substr($fvStr, 0, 32) . '...';
+            // 8. Database activity highlights
+            if (!empty($highlights['database'])) {
+                $db = $highlights['database'];
+                $dbText = $db['tableName'] . ' [' . $db['operation'] . ']';
+                if (!empty($db['fields'])) {
+                    $fieldSummary = [];
+                    foreach ($db['fields'] as $fn => $fv) {
+                        $fvStr = (string)$fv;
+                        if (mb_strlen($fvStr) > 35) {
+                            $fvStr = mb_substr($fvStr, 0, 32) . '...';
+                        }
+                        $fieldSummary[] = "{$fn}={$fvStr}";
                     }
-                    $fieldSummary[] = "{$fn}={$fvStr}";
+                    $dbText .= ' (' . implode(', ', array_slice($fieldSummary, 0, 3)) . ')';
                 }
-                $dbText .= ' (' . implode(', ', array_slice($fieldSummary, 0, 3)) . ')';
+                $parts[] = $dbText;
             }
-            $parts[] = $dbText;
-        }
 
-        // If no structured highlights were extracted, show key raw settings
-        if (empty($parts) && !empty($rawSettings)) {
-            $settingPairs = [];
-            foreach ($rawSettings as $s) {
-                if ($s['value'] !== null && $s['value'] !== '') {
-                    $settingPairs[] = $s['name'] . ': ' . $s['value'];
+            // If no structured highlights were extracted, show key raw settings
+            if (empty($parts) && !empty($rawSettings)) {
+                $settingPairs = [];
+                foreach ($rawSettings as $s) {
+                    if ($s['value'] !== null && $s['value'] !== '') {
+                        $settingPairs[] = $s['name'] . ': ' . $s['value'];
+                    }
+                }
+                if (!empty($settingPairs)) {
+                    $parts[] = implode(', ', array_slice($settingPairs, 0, 3));
                 }
             }
-            if (!empty($settingPairs)) {
-                $parts[] = implode(', ', array_slice($settingPairs, 0, 3));
+
+            if ($settingCount > 0) {
+                $parts[] = '[' . $settingCount . ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.params', [], 'params') . ']';
             }
-        }
 
-        if ($settingCount > 0) {
-            $parts[] = '[' . $settingCount . ' ' . DetailedLogHelper::translate('plugins.generic.detailedLog.params', [], 'params') . ']';
+            return implode(' | ', $parts);
+        } catch (\Throwable $e) {
+            DetailedLogHelper::logError('Error rendering details cell', $e);
+            return '—';
         }
-
-        return implode(' | ', $parts);
     }
 }
