@@ -1,0 +1,251 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgid "plugins.generic.detailedLog.displayName"
+msgstr "Detailed Activity Log Plugin"
+
+msgid "plugins.generic.detailedLog.description"
+msgstr "Displays full detailed audit logs for submissions and articles including all parameters, files, decisions, review rounds, reviewer names, and stages from the event_log_settings table."
+
+msgid "plugins.generic.detailedLog.grid.column.details"
+msgstr "Activity Details & Settings"
+
+msgid "plugins.generic.detailedLog.viewDetails"
+msgstr "View Details"
+
+msgid "plugins.generic.detailedLog.viewDetailsTitle"
+msgstr "Activity Log Details - #{$id}"
+
+msgid "plugins.generic.detailedLog.logId"
+msgstr "Log ID"
+
+msgid "plugins.generic.detailedLog.exportCsv"
+msgstr "Export CSV"
+
+msgid "plugins.generic.detailedLog.exportJson"
+msgstr "Export JSON"
+
+msgid "plugins.generic.detailedLog.category.all"
+msgstr "All Categories"
+
+msgid "plugins.generic.detailedLog.category.decision"
+msgstr "Editorial Decisions"
+
+msgid "plugins.generic.detailedLog.category.review"
+msgstr "Peer Review"
+
+msgid "plugins.generic.detailedLog.category.file"
+msgstr "File Activities"
+
+msgid "plugins.generic.detailedLog.category.participant"
+msgstr "Participants"
+
+msgid "plugins.generic.detailedLog.category.publication"
+msgstr "Publications"
+
+msgid "plugins.generic.detailedLog.category.email"
+msgstr "Emails & Notices"
+
+msgid "plugins.generic.detailedLog.category.metadata"
+msgstr "Metadata"
+
+msgid "plugins.generic.detailedLog.category.communication"
+msgstr "Discussions"
+
+msgid "plugins.generic.detailedLog.category.general"
+msgstr "General"
+
+msgid "plugins.generic.detailedLog.systemUser"
+msgstr "System / Automated"
+
+msgid "plugins.generic.detailedLog.emailNotice"
+msgstr "Notification"
+
+msgid "plugins.generic.detailedLog.generalWorkflow"
+msgstr "General"
+
+msgid "plugins.generic.detailedLog.byEditor"
+msgstr "by {$editor}"
+
+msgid "plugins.generic.detailedLog.params"
+msgstr "params"
+
+msgid "plugins.generic.detailedLog.settingsCountTooltip"
+msgstr "{$count} settings recorded in event_log_settings"
+
+msgid "plugins.generic.detailedLog.card.fileDetails"
+msgstr "File Information"
+
+msgid "plugins.generic.detailedLog.card.decisionDetails"
+msgstr "Editorial Decision"
+
+msgid "plugins.generic.detailedLog.card.reviewDetails"
+msgstr "Peer Review Information"
+
+msgid "plugins.generic.detailedLog.card.participantDetails"
+msgstr "Participant Details"
+
+msgid "plugins.generic.detailedLog.card.communicationDetails"
+msgstr "Communication / Message"
+
+msgid "plugins.generic.detailedLog.table.allSettingsTitle"
+msgstr "All Recorded Parameters (event_log_settings)"
+
+msgid "plugins.generic.detailedLog.table.allSettingsSubtitle"
+msgstr "Full database attributes stored in event_log_settings for this specific activity event."
+
+msgid "plugins.generic.detailedLog.table.settingName"
+msgstr "Setting Name"
+
+msgid "plugins.generic.detailedLog.table.locale"
+msgstr "Locale"
+
+msgid "plugins.generic.detailedLog.table.rawValue"
+msgstr "Stored Database Value"
+
+msgid "plugins.generic.detailedLog.table.interpretedValue"
+msgstr "Interpreted / Meaning"
+
+msgid "plugins.generic.detailedLog.records"
+msgstr "records"
+
+msgid "plugins.generic.detailedLog.noSettingsRecorded"
+msgstr "No additional settings recorded in event_log_settings for this log entry."
+
+msgid "plugins.generic.detailedLog.viewRawJson"
+msgstr "View Raw JSON Payload (Debug & Audit)"
+
+msgid "plugins.generic.detailedLog.filter.searchPlaceholder"
+msgstr "Search user, filename, decision, action..."
+
+msgid "plugins.generic.detailedLog.anonymizedFile"
+msgstr "Anonymized Review Attachment"
+
+msgid "plugins.generic.detailedLog.entryNotFound"
+msgstr "The requested log entry could not be found."
+
+msgid "plugins.generic.detailedLog.setting.fileId"
+msgstr "File ID"
+
+msgid "plugins.generic.detailedLog.setting.filename"
+msgstr "File Name"
+
+msgid "plugins.generic.detailedLog.setting.fileStage"
+msgstr "File Stage"
+
+msgid "plugins.generic.detailedLog.setting.submissionFileId"
+msgstr "Submission File ID"
+
+msgid "plugins.generic.detailedLog.setting.sourceSubmissionFileId"
+msgstr "Source Submission File ID"
+
+msgid "plugins.generic.detailedLog.setting.decision"
+msgstr "Editorial Decision"
+
+msgid "plugins.generic.detailedLog.setting.editorName"
+msgstr "Editor Name"
+
+msgid "plugins.generic.detailedLog.setting.editorId"
+msgstr "Editor ID"
+
+msgid "plugins.generic.detailedLog.setting.reviewerName"
+msgstr "Reviewer Name"
+
+msgid "plugins.generic.detailedLog.setting.reviewAssignmentId"
+msgstr "Review Assignment ID"
+
+msgid "plugins.generic.detailedLog.setting.round"
+msgstr "Review Round"
+
+msgid "plugins.generic.detailedLog.setting.reviewDueDate"
+msgstr "Review Due Date"
+
+msgid "plugins.generic.detailedLog.setting.stageId"
+msgstr "Workflow Stage ID"
+
+msgid "plugins.generic.detailedLog.setting.userFullName"
+msgstr "User Full Name"
+
+msgid "plugins.generic.detailedLog.setting.userGroupName"
+msgstr "User Role / Group"
+
+msgid "plugins.generic.detailedLog.setting.username"
+msgstr "Username"
+
+msgid "plugins.generic.detailedLog.setting.userId"
+msgstr "User ID"
+
+msgid "plugins.generic.detailedLog.setting.submissionId"
+msgstr "Submission ID"
+
+msgid "plugins.generic.detailedLog.setting.subject"
+msgstr "Subject"
+
+msgid "plugins.generic.detailedLog.setting.senderName"
+msgstr "Sender Name"
+
+msgid "plugins.generic.detailedLog.setting.senderId"
+msgstr "Sender ID"
+
+msgid "plugins.generic.detailedLog.setting.recipientName"
+msgstr "Recipient Name"
+
+msgid "plugins.generic.detailedLog.setting.recipientId"
+msgstr "Recipient ID"
+
+msgid "plugins.generic.detailedLog.setting.recipientCount"
+msgstr "Recipient Count"
+
+msgid "plugins.generic.detailedLog.setting.copyrightNotice"
+msgstr "Copyright Notice"
+
+msgid "plugins.generic.detailedLog.fileStage.submission"
+msgstr "Submission File"
+
+msgid "plugins.generic.detailedLog.fileStage.note"
+msgstr "Note Attachment"
+
+msgid "plugins.generic.detailedLog.fileStage.reviewFile"
+msgstr "Review File"
+
+msgid "plugins.generic.detailedLog.fileStage.reviewAttachment"
+msgstr "Review Attachment"
+
+msgid "plugins.generic.detailedLog.fileStage.finalDraft"
+msgstr "Final Draft"
+
+msgid "plugins.generic.detailedLog.fileStage.copyedit"
+msgstr "Copyedited File"
+
+msgid "plugins.generic.detailedLog.fileStage.proof"
+msgstr "Proof / Galley"
+
+msgid "plugins.generic.detailedLog.fileStage.productionReady"
+msgstr "Production Ready"
+
+msgid "plugins.generic.detailedLog.fileStage.attachment"
+msgstr "Attachment"
+
+msgid "plugins.generic.detailedLog.fileStage.reviewRevision"
+msgstr "Review Revision"
+
+msgid "plugins.generic.detailedLog.fileStage.dependent"
+msgstr "Dependent File"
+
+msgid "plugins.generic.detailedLog.fileStage.query"
+msgstr "Discussion File"
+
+msgid "plugins.generic.detailedLog.fileStage.internalReviewFile"
+msgstr "Internal Review File"
+
+msgid "plugins.generic.detailedLog.fileStage.internalReviewRevision"
+msgstr "Internal Review Revision"
+

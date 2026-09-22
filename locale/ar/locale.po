@@ -1,0 +1,251 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ar\n"
+
+msgid "plugins.generic.detailedLog.displayName"
+msgstr "ملحق سجل الأنشطة المفصل"
+
+msgid "plugins.generic.detailedLog.description"
+msgstr "يعرض سجل التدقيق التفصيلي الكامل لطلبات النشر والمقالات متضمناً كافة المعاملات والملفات والقرارات وجولات التحكيم وأسماء المحكمين والمراحل من جدول event_log_settings."
+
+msgid "plugins.generic.detailedLog.grid.column.details"
+msgstr "تفاصيل النشاط والمعاملات"
+
+msgid "plugins.generic.detailedLog.viewDetails"
+msgstr "عرض التفاصيل"
+
+msgid "plugins.generic.detailedLog.viewDetailsTitle"
+msgstr "تفاصيل سجل النشاط - #{$id}"
+
+msgid "plugins.generic.detailedLog.logId"
+msgstr "معرف السجل"
+
+msgid "plugins.generic.detailedLog.exportCsv"
+msgstr "تصدير CSV"
+
+msgid "plugins.generic.detailedLog.exportJson"
+msgstr "تصدير JSON"
+
+msgid "plugins.generic.detailedLog.category.all"
+msgstr "جميع الفئات"
+
+msgid "plugins.generic.detailedLog.category.decision"
+msgstr "قرارات التحرير"
+
+msgid "plugins.generic.detailedLog.category.review"
+msgstr "التحكيم العلمي"
+
+msgid "plugins.generic.detailedLog.category.file"
+msgstr "أنشطة الملفات"
+
+msgid "plugins.generic.detailedLog.category.participant"
+msgstr "المشاركون"
+
+msgid "plugins.generic.detailedLog.category.publication"
+msgstr "النشر والإصدار"
+
+msgid "plugins.generic.detailedLog.category.email"
+msgstr "الرسائل والإشعارات"
+
+msgid "plugins.generic.detailedLog.category.metadata"
+msgstr "البيانات الوصفية"
+
+msgid "plugins.generic.detailedLog.category.communication"
+msgstr "المناقشات"
+
+msgid "plugins.generic.detailedLog.category.general"
+msgstr "عام"
+
+msgid "plugins.generic.detailedLog.systemUser"
+msgstr "النظام / آلي"
+
+msgid "plugins.generic.detailedLog.emailNotice"
+msgstr "إشعار"
+
+msgid "plugins.generic.detailedLog.generalWorkflow"
+msgstr "عام"
+
+msgid "plugins.generic.detailedLog.byEditor"
+msgstr "بواسطة {$editor}"
+
+msgid "plugins.generic.detailedLog.params"
+msgstr "معاملات"
+
+msgid "plugins.generic.detailedLog.settingsCountTooltip"
+msgstr "تم حفظ {$count} من المعاملات في جدول event_log_settings"
+
+msgid "plugins.generic.detailedLog.card.fileDetails"
+msgstr "معلومات الملف"
+
+msgid "plugins.generic.detailedLog.card.decisionDetails"
+msgstr "قرار التحرير"
+
+msgid "plugins.generic.detailedLog.card.reviewDetails"
+msgstr "معلومات التحكيم"
+
+msgid "plugins.generic.detailedLog.card.participantDetails"
+msgstr "بيانات المشارك"
+
+msgid "plugins.generic.detailedLog.card.communicationDetails"
+msgstr "المراسلات / الرسائل"
+
+msgid "plugins.generic.detailedLog.table.allSettingsTitle"
+msgstr "كافة المعاملات المسجلة (event_log_settings)"
+
+msgid "plugins.generic.detailedLog.table.allSettingsSubtitle"
+msgstr "كافة الخصائص المخزنة في جدول event_log_settings لهذا الحدث المحدد."
+
+msgid "plugins.generic.detailedLog.table.settingName"
+msgstr "اسم الإعداد / المعامل"
+
+msgid "plugins.generic.detailedLog.table.locale"
+msgstr "اللغة"
+
+msgid "plugins.generic.detailedLog.table.rawValue"
+msgstr "القيمة المخزنة في قاعدة البيانات"
+
+msgid "plugins.generic.detailedLog.table.interpretedValue"
+msgstr "المعنى / التفسير"
+
+msgid "plugins.generic.detailedLog.records"
+msgstr "سجلات"
+
+msgid "plugins.generic.detailedLog.noSettingsRecorded"
+msgstr "لا توجد معاملات إضافية مسجلة في event_log_settings لهذا الحدث."
+
+msgid "plugins.generic.detailedLog.viewRawJson"
+msgstr "عرض بيانات JSON الأولية (للتدقيق وفحص النظام)"
+
+msgid "plugins.generic.detailedLog.filter.searchPlaceholder"
+msgstr "بحث بالمستخدم، اسم الملف، القرار، النشاط..."
+
+msgid "plugins.generic.detailedLog.anonymizedFile"
+msgstr "ملف مرفق محكم (مجهول الهوية)"
+
+msgid "plugins.generic.detailedLog.entryNotFound"
+msgstr "تعذر العثور على سجل الحدث المطلوب."
+
+msgid "plugins.generic.detailedLog.setting.fileId"
+msgstr "معرف الملف"
+
+msgid "plugins.generic.detailedLog.setting.filename"
+msgstr "اسم الملف"
+
+msgid "plugins.generic.detailedLog.setting.fileStage"
+msgstr "مرحلة الملف"
+
+msgid "plugins.generic.detailedLog.setting.submissionFileId"
+msgstr "معرف ملف طلب النشر"
+
+msgid "plugins.generic.detailedLog.setting.sourceSubmissionFileId"
+msgstr "معرف الملف المصدر"
+
+msgid "plugins.generic.detailedLog.setting.decision"
+msgstr "قرار التحرير"
+
+msgid "plugins.generic.detailedLog.setting.editorName"
+msgstr "اسم المحرر"
+
+msgid "plugins.generic.detailedLog.setting.editorId"
+msgstr "معرف المحرر"
+
+msgid "plugins.generic.detailedLog.setting.reviewerName"
+msgstr "اسم المحكم"
+
+msgid "plugins.generic.detailedLog.setting.reviewAssignmentId"
+msgstr "معرف مهمة التحكيم"
+
+msgid "plugins.generic.detailedLog.setting.round"
+msgstr "جولة التحكيم"
+
+msgid "plugins.generic.detailedLog.setting.reviewDueDate"
+msgstr "الموعد النهائي للتحكيم"
+
+msgid "plugins.generic.detailedLog.setting.stageId"
+msgstr "معرف مرحلة سير العمل"
+
+msgid "plugins.generic.detailedLog.setting.userFullName"
+msgstr "الاسم الكامل للمستخدم"
+
+msgid "plugins.generic.detailedLog.setting.userGroupName"
+msgstr "دور / مجموعة المستخدم"
+
+msgid "plugins.generic.detailedLog.setting.username"
+msgstr "اسم المستخدم"
+
+msgid "plugins.generic.detailedLog.setting.userId"
+msgstr "معرف المستخدم"
+
+msgid "plugins.generic.detailedLog.setting.submissionId"
+msgstr "معرف طلب النشر"
+
+msgid "plugins.generic.detailedLog.setting.subject"
+msgstr "الموضوع"
+
+msgid "plugins.generic.detailedLog.setting.senderName"
+msgstr "اسم المرسل"
+
+msgid "plugins.generic.detailedLog.setting.senderId"
+msgstr "معرف المرسل"
+
+msgid "plugins.generic.detailedLog.setting.recipientName"
+msgstr "اسم المستلم"
+
+msgid "plugins.generic.detailedLog.setting.recipientId"
+msgstr "معرف المستلم"
+
+msgid "plugins.generic.detailedLog.setting.recipientCount"
+msgstr "عدد المستلمين"
+
+msgid "plugins.generic.detailedLog.setting.copyrightNotice"
+msgstr "بيان حقوق النشر"
+
+msgid "plugins.generic.detailedLog.fileStage.submission"
+msgstr "ملف طلب النشر"
+
+msgid "plugins.generic.detailedLog.fileStage.note"
+msgstr "مرفق ملاحظة"
+
+msgid "plugins.generic.detailedLog.fileStage.reviewFile"
+msgstr "ملف التحكيم"
+
+msgid "plugins.generic.detailedLog.fileStage.reviewAttachment"
+msgstr "مرفق تقرير التحكيم"
+
+msgid "plugins.generic.detailedLog.fileStage.finalDraft"
+msgstr "المسودة النهائية"
+
+msgid "plugins.generic.detailedLog.fileStage.copyedit"
+msgstr "ملف التدقيق اللغوي"
+
+msgid "plugins.generic.detailedLog.fileStage.proof"
+msgstr "مسودة القراءة / اللوحة الطباعية"
+
+msgid "plugins.generic.detailedLog.fileStage.productionReady"
+msgstr "جاهز للإنتاج"
+
+msgid "plugins.generic.detailedLog.fileStage.attachment"
+msgstr "مرفق إضافي"
+
+msgid "plugins.generic.detailedLog.fileStage.reviewRevision"
+msgstr "تعديل التحكيم"
+
+msgid "plugins.generic.detailedLog.fileStage.dependent"
+msgstr "ملف تابع"
+
+msgid "plugins.generic.detailedLog.fileStage.query"
+msgstr "ملف مناقشة"
+
+msgid "plugins.generic.detailedLog.fileStage.internalReviewFile"
+msgstr "ملف التحكيم الداخلي"
+
+msgid "plugins.generic.detailedLog.fileStage.internalReviewRevision"
+msgstr "تعديل التحكيم الداخلي"
+
